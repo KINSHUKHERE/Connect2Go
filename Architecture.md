@@ -249,7 +249,7 @@ d:/Other Projects/Connect2Go/
 │       │   └── safetyRoutes.js
 │       └── utils/
 │           ├── geoUtils.js      # Haversine distance, jitter/fuzzing
-│           └── seedData.js      # Poornima University & Sitapura campus seed data
+│           └── seedData.js      # Mock demo users & local activity requests
 │
 └── frontend/                    # Vite + React 19 + Tailwind CSS Client
     ├── package.json
@@ -272,7 +272,7 @@ d:/Other Projects/Connect2Go/
         │   ├── layout/
         │   │   ├── Navbar.jsx   # Top navigation with status & notification badge
         │   │   ├── Sidebar.jsx  # Category & filter controls
-        │   │   └── Footer.jsx   # Poornima University project footer
+        │   │   └── Footer.jsx   # Modern application footer
         │   ├── map/
         │   │   ├── MapView.jsx  # Leaflet map container
         │   │   ├── RadiusCircle.jsx # Live radar search radius visualizer

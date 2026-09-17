@@ -1,7 +1,6 @@
 # Connect2Go (Nearby Connect) 🚀
 
-> **A Location-Based Socializing & Activity Partner Platform**  
-> *B.Tech VII Semester Minor Project — Poornima University, Jaipur*
+> **A Location-Based Socializing & Activity Partner Platform**
 
 [![Status](https://img.shields.io/badge/status-active_development-blue.svg)]()
 [![Stack](https://img.shields.io/badge/stack-React_19_•_Node.js_•_Express_•_MongoDB_•_Socket.IO-indigo.svg)]()
@@ -18,20 +17,6 @@ Unlike traditional social media focused on follower feeds, **Connect2Go is hyper
 2. **Geospatial Discovery:** Radius-based discovery using HTML5 Geolocation, Leaflet interactive maps, and MongoDB `2dsphere` spatial indexing.
 3. **Multi-Factor Matching:** Matches partners based on distance, shared interests, availability schedules, and skill level.
 4. **Anonymous Real-Time Chat & Reveal Handshake:** Real-time chat using Socket.IO with masked pseudonyms and 3D avatars (Meshy AI aesthetic). Real identities are only unveiled upon mutual consent through a dual "Reveal Identity" handshake.
-
----
-
-## 👥 Project Team & Supervision
-
-- **Academic Institution:** Poornima University, Jaipur (Session: 2023–2027)
-- **Degree:** Bachelor of Technology (B.Tech VII Semester)
-- **Department:** Department of Computer Science & Engineering
-- **Supervisor:** **Kireet Sir**, Associate Professor
-- **Student Team:**
-  - **Kinshuk Khandelwal** (`2023PUFCEBCEX13565`) — Coordination, Requirements & Integration
-  - **Kirti** (`2023PUFCEBCEX15043`) — UI/UX & Frontend
-  - **Lavanshu Bansal** (`2023PUFCEBCEX13854`) — Backend, Database & APIs
-  - **Lavish Garg** (`2023PUFCEBCEX13505`) — Matching Engine, Testing & Deployment
 
 ---
 

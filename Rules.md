@@ -73,7 +73,7 @@
 3. **No Uncaught Exceptions:** All database transactions and geospatial `$near` queries must be wrapped in try-catch blocks with helpful fallback responses.
 
 ### 3.2 Frontend Error Handling
-1. **Geolocation Fallback:** Never crash or freeze if the browser denies GPS permissions. Catch `navigator.geolocation.getCurrentPosition` errors and automatically set default fallback coordinates (Poornima University Campus: `[26.7725, 75.8753]`) with an informative banner informing the user they can manually drag the pin.
+1. **Geolocation Fallback:** Never crash or freeze if the browser denies GPS permissions. Catch `navigator.geolocation.getCurrentPosition` errors and automatically set default fallback coordinates (`[26.7725, 75.8753]`) with an informative banner informing the user they can manually drag the pin.
 2. **WebSocket Reconnection:** Configure `socket.io-client` with automatic reconnection attempts (`reconnection: true`, `reconnectionDelay: 1000`).
 3. **User Feedback:** Use toast notifications for success and error alerts; never use intrusive native `alert()` or `prompt()` dialogs.
 
@@ -161,6 +161,6 @@ Every screen must feature **one clear primary action**.
 ## 6. AI Development Rules of Engagement
 
 1. **Never Hallucinate Endpoints:** Follow the explicit REST and WebSocket contracts defined in `Architecture.md`.
-2. **Pre-seed Demo Data:** Always include the demo seed dataset featuring Poornima University / Sitapura campus peers (Kinshuk, Kirti, Lavanshu, Lavish) with active requests (Badminton, Hackathon, Cycling, Study Session) so the application is instantly demonstrable for academic viva and evaluation.
+2. **Pre-seed Demo Data:** Always include the demo seed dataset featuring diverse active peers with sample requests (Badminton, Hackathon, Cycling, Study Session) so the application is instantly testable and demonstrable out-of-the-box.
 3. **No Code Truncation:** Do not leave placeholder comments like `// implement logic here` or `// todo`. Every file must be complete, syntactically valid, and functional.
 4. **Zero Console Errors:** The frontend and backend must compile cleanly with zero unhandled exceptions or critical lint warnings.

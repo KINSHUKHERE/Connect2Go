@@ -3,13 +3,6 @@
 **Project Name:** Connect2Go (*"Nearby Connect — A Location-Based Socializing & Activity Partner Platform"*)  
 **Version:** 1.0.0  
 **Status:** Approved for Implementation  
-**Academic Context:** Minor Project (B.Tech VII Semester), Department of Computer Science & Engineering, Poornima University, Jaipur  
-**Faculty Guide:** Kireet Sir, Associate Professor  
-**Student Team:**  
-- **Kinshuk Khandelwal** (Reg No: 2023PUFCEBCEX13565) – Project Coordination, Requirements & Integration  
-- **Kirti** (Reg No: 2023PUFCEBCEX15043) – UI/UX & Frontend Development  
-- **Lavanshu Bansal** (Reg No: 2023PUFCEBCEX13854) – Backend Architecture, Database & REST APIs  
-- **Lavish Garg** (Reg No: 2023PUFCEBCEX13505) – Matching Algorithm, Testing & Deployment  
 
 ---
 
@@ -41,7 +34,7 @@ Modern literature indicates that common interests and physical proximity catalyz
 
 ## 3. Target Users & User Personas
 
-### Persona 1: The Campus Athlete (Rohan, 21 — Engineering Student at Poornima University)
+### Persona 1: The Campus Athlete (Rohan, 21 — Local Engineering Student)
 - **Goal:** Play badminton or cricket after classes (5:30 PM - 7:00 PM).
 - **Friction:** Roommates are busy or uninterested; doesn't know who else in the nearby hostels or Sitapura area plays at an intermediate level.
 - **Connect2Go Journey:** Creates a request: *"Intermediate Badminton Partner needed @ Sitapura Arena tonight"* with a 3 km radius. Receives match notifications, chats anonymously, confirms the court timing, and reveals identity.
@@ -137,7 +130,7 @@ $$\text{MatchScore} = (W_{\text{dist}} \times S_{\text{dist}}) + (W_{\text{int}}
 - **Location Fuzzing:** Optional setting to add a ~400m jitter to user coordinates to protect residential privacy.
 
 ### Module 10: Community Hotspots & Stats Dashboard
-- Pre-configured Poornima University / Sitapura campus hotspots.
+- Pre-configured local community and campus activity hotspots.
 - Live counters for active requests, connected peers, and popular activities.
 
 ---

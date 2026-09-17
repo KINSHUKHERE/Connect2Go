@@ -8,9 +8,6 @@
 
 ## 1. Project Overview & Quick Reference
 - **Concept:** Location-based socializing and activity-partner platform combining radius discovery, matching engine, and anonymous real-time chat with a mutual identity reveal handshake.
-- **Academic Context:** Minor Project (B.Tech VII Sem CSE), Poornima University, Jaipur.
-- **Supervisor:** Kireet Sir, Associate Professor.
-- **Team:** Kinshuk Khandelwal, Kirti, Lavanshu Bansal, Lavish Garg.
 - **Reference Files:**
   - `PRD.md`: Full product requirements and 10 modules.
   - `Architecture.md`: System flow, ERD, REST routes, Socket.IO protocols.
@@ -35,14 +32,13 @@
 
 ---
 
-## 3. Seed Campus Coordinates & Test Personas
-- **Primary Campus Location:** Poornima University, Sitapura Extension, Jaipur, Rajasthan  
-  - Coordinates: Latitude `26.7725`, Longitude `75.8753` (GeoJSON: `[75.8753, 26.7725]`).
+## 3. Default Demo Coordinates & Personas
+- **Default City Coordinates:** Latitude `26.7725`, Longitude `75.8753` (GeoJSON: `[75.8753, 26.7725]`).
 - **Pre-Seeded Demo Accounts:**
-  1. `kinshuk@poornima.edu.in` (Kinshuk Khandelwal) — Sports / Badminton enthusiast.
-  2. `kirti@poornima.edu.in` (Kirti) — UI/UX & Web Dev study partner.
-  3. `lavanshu@poornima.edu.in` (Lavanshu Bansal) — Backend & Hackathon partner.
-  4. `lavish@poornima.edu.in` (Lavish Garg) — Cycling & Fitness enthusiast.
+  1. `alex@connect2go.com` (Alex K.) — Sports / Badminton enthusiast.
+  2. `sarah@connect2go.com` (Sarah M.) — UI/UX & Web Dev study partner.
+  3. `liam@connect2go.com` (Liam B.) — Backend & Hackathon partner.
+  4. `maya@connect2go.com` (Maya G.) — Cycling & Fitness enthusiast.
 
 ---
 
