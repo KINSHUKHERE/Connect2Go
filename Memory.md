@@ -50,8 +50,8 @@
 
 | Phase # | Phase Title | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **Phase 0** | Documentation & Design System Setup | **COMPLETED** | PRD, Architecture, Rules, Phases, Design, Memory created. `ui-ux-pro-max` installed. |
-| **Phase 1** | Project Initialization & Scaffolding | *PENDING* | Backend & Frontend packages setup |
+| **Phase 0** | Documentation, Git & Design System Setup | **COMPLETED** | PRD, Architecture, Rules, Phases, Design, Memory created. Git repo connected & pushed to GitHub (`KINSHUKHERE/Connect2Go`). Comprehensive `.gitignore` active. `ui-ux-pro-max` installed. |
+| **Phase 1** | Project Initialization & Scaffolding | *READY* | Backend & Frontend packages setup |
 | **Phase 2** | Database Modeling & Seed Data | *PENDING* | User, ActivityRequest, Chat models with `2dsphere` index |
 | **Phase 3** | Authentication & User Profile | *PENDING* | JWT auth, bcrypt, profile editor |
 | **Phase 4** | Activity Requests & Geospatial API | *PENDING* | CRUD, `$near` radius search |
