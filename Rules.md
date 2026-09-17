@@ -79,21 +79,72 @@
 
 ---
 
-## 4. UI/UX Pro Max Rules & Accessibility Guidelines
+## 4. Senior UI/UX & Frontend Engineering Rules (Gen-Z Calm Social Discovery)
 
-1. **Touch Targets:** All interactive elements (buttons, sliders, toggles, map markers) MUST have a minimum tap area of **$44 \times 44\text{ px}$**.
-2. **Contrast Standards:** Follow WCAG 2.1 AA contrast requirements:
-   - Normal text: Minimum contrast ratio of **4.5:1** against the background.
-   - Large text / Badges: Minimum contrast ratio of **3.0:1**.
-   - Do NOT use low-contrast gray-on-gray body text.
-3. **Responsive Breakpoints:**
-   - Mobile-First layout: Single column feed on screens $< 768\text{px}$.
-   - Split screen on desktop $\ge 1024\text{px}$: Left panel for interactive map with radar radius visualizer; right panel for Bento grid of matching requests.
-   - Zero horizontal page scrolling (`overflow-x: hidden`).
-4. **State Indicators:** Every network request must provide visible feedback:
-   - Skeletons or pulse spinners during data fetching.
-   - Disabled states with visual opacity during form submissions.
-   - Distinct typing indicator in chat threads.
+### 4.1 Visual Feel & Design Ethos
+- **The Core Feel:** *"Spotify's friendliness + Airbnb's clean UI + modern Gen-Z community app + calm wellness-inspired visual language"*.
+- **Anti-Patterns:**
+  - DO NOT make it look like Facebook, Instagram, Tinder, or a corporate dashboard template.
+  - NO excessive gradients, neon colors, heavy glassmorphism, or sharp rectangular cards.
+  - NO cluttered layouts, huge text everywhere, or visually heavy shadows.
+  - Use whitespace generously and intelligently.
+
+### 4.2 Exact Color Rules
+- **Brand Green:** Primary `#22C55E` (Emerald), Secondary `#16A34A`. Green MUST remain the dominant brand anchor.
+- **Mints:** Soft Mint `#A7F3D0`, Very Light Mint `#ECFDF5`.
+- **Neutrals:** Primary Text `#0F172A`, Secondary Text `#475569`, Background Canvas `#F8FAFC`, White Cards `#FFFFFF`, Thin Borders `#E2E8F0`.
+- **Restrained Accents:** Sparing use of Soft Amber (`#F59E0B`), Soft Pink (`#EC4899`), Soft Red (`#EF4444`). Never use all accents simultaneously.
+
+### 4.3 Typography & Shapes
+- **Typography:** `Plus Jakarta Sans` (Fallback: `Inter`). Modern, friendly, rounded, clean, highly readable.
+  - Body text $\approx 16\text{px}$. Small text $13\text{--}14\text{px}$.
+  - Medium and semibold weights for importance. Avoid ultra-thin fonts and excessive all-caps.
+- **Border Radius Scale:**
+  - Small: `10px` (inputs, dropdowns)
+  - Medium: `14px` (buttons, filter pills)
+  - Large: `20px` (activity cards, chat bubbles, sidebar containers)
+  - Extra Large: `28px` (modals, hero containers, bottom navigation sheets)
+- **Soft Shadows:** Standard subtle elevation `0 8px 30px rgba(15, 23, 42, 0.06)`. Never use visually heavy shadows.
+
+### 4.4 Responsive Layout Contracts
+- **Mobile (375px – 430px):** Sticky compact header, floating bottom navigation, large tap targets ($\ge 44 \times 44\text{px}$), swipeable card trays, full-width buttons.
+- **Tablet (768px – 1024px):** 2-column discovery grid, collapsible or compact navigation.
+- **Laptop & Desktop (1280px – 1920px):** Structured vertical sidebar, multi-column discovery feed, max container width of `1280px` – `1400px`.
+
+### 4.5 Component-First Architecture (Never Write Giant Monolithic Files)
+All pages MUST be assembled from modular, reusable components:
+- `Button`, `Input`, `Select`, `Modal`, `Avatar`, `Badge`, `ActivityCard`, `PersonCard`, `InterestTag`, `SearchBar`, `Navbar`, `Sidebar`, `BottomNavigation`, `NotificationCard`, `ChatBubble`, `ProfileCard`, `EmptyState`, `Skeleton`, `LocationSelector`, `RadiusSelector`.
+- Consistent Iconography: Exclusively use `lucide-react` (simple, rounded, minimal, consistent).
+
+### 4.6 Animation & Motion Rules
+- Animations must feel **CALM + SMOOTH + PREMIUM** (inspired by Swishy AI spring physics).
+- Subtle hover elevations, smooth button presses, gentle modal fade/scale transitions (`cubic-bezier(0.16, 1, 0.3, 1)`).
+- NO constant floating elements, excessive parallax, or distracting background animations.
+
+### 4.7 State Handling Standards
+- **Loading States:** Strictly use skeleton loaders matching component layouts; avoid blocking spinners.
+- **Empty States:** Friendly, encouraging graphics and supportive copy with a direct CTA (e.g. *"No activities nearby yet. Try expanding your radius or create your own!"*).
+
+### 4.8 The 8-Step Pre-Implementation Rule
+Before implementing ANY screen or component:
+1. Understand the user goal.
+2. Design the information hierarchy.
+3. Establish the responsive layout.
+4. Use modular reusable components.
+5. Add calm, subtle animations.
+6. Check mobile responsiveness.
+7. Verify WCAG 2.1 AA accessibility.
+8. Maintain the Connect2Go design tokens.
+
+### 4.9 The 6 Core UX Questions Test
+Every screen must make immediately clear:
+1. *Where am I?*
+2. *What can I do here?*
+3. *Who is nearby?*
+4. *What activities are available?*
+5. *How can I connect?*
+6. *Is my information safe?*
+Every screen must feature **one clear primary action**.
 
 ---
 
