@@ -17,18 +17,21 @@
 
 ---
 
-## 2. Configured Tech Stack & Design Ecosystem
+## 2. Configured Tech Stack & Cloud Services
 - **Brand Identity:** Connect2Go (*"People Nearby. Activities Together."*)
 - **Design Ethos:** *"Spotify's friendliness + Airbnb's clean UI + modern Gen-Z community app + calm wellness-inspired visual language"*.
+- **Database:** Supabase (Managed PostgreSQL + PostGIS spatial extensions).
+- **Authentication:** Supabase Auth with Email/Password & **Google OAuth 2.0**.
+- **Media Storage:** Cloudinary (CDN-optimized image transformations, responsive WebP delivery).
+- **Real-Time Layer:** Supabase Realtime & Socket.IO.
+- **Frontend Stack:** React 19 (Vite), Tailwind CSS, Leaflet / React-Leaflet, Lucide Icons, Plus Jakarta Sans.
 - **Official Brand Assets Copied & Verified:**
-  - `design-assets/`: Root design folder for immediate visualization (`Png logo.png`, `Normal Logo.png`, `Favicon.png`, `Ui.png`).
+  - `design-assets/`: Root design folder (`Png logo.png`, `Normal Logo.png`, `Favicon.png`, `Ui.png`).
   - `frontend/public/`: `logo.png`, `logo-normal.png`, `favicon.png`.
   - `frontend/src/assets/`: `logo.png`, `logo-normal.png`, `favicon.png`, `ui-mockup.png`.
 - **Backend Hierarchy Established:** `backend/src/{config, controllers, middleware, models, routes, services, sockets, utils}`.
 - **Frontend Hierarchy Established:** `frontend/src/{components/{layout, map, requests, chat, profile, safety, ui}, context, pages, services, assets}` and `frontend/public/`.
-- **Core Color Tokens:** Primary Green `#22C55E`, Secondary `#16A34A`, Mint `#A7F3D0`, Light Mint `#ECFDF5`, Canvas `#F8FAFC`, White `#FFFFFF`, Border `#E2E8F0`, Dark Text `#0F172A`.
-- **Typography:** `Plus Jakarta Sans` (Fallback: `Inter`).
-- **Installed Skills:** `ui-ux-pro-max-skill` (Cloned & installed at `C:\Users\herek\.gemini\config\skills\ui-ux-pro-max-skill`).
+- **Installed Skills:** `ui-ux-pro-max-skill`.
 
 ---
 
@@ -42,20 +45,18 @@
 
 ---
 
-## 4. Phase Completion Checklist
+## 4. Progressive Level Completion Checklist
 
-| Phase # | Phase Title | Status | Notes |
+| Level # | Level Title | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **Phase 0** | Documentation, Assets, Folders & Design Spec | **COMPLETED** | PRD, Architecture, Rules, Phases, Design (28 sections), Memory created. Brand assets (logos, favicon, UI mockup) copied. Frontend & Backend folder trees created. `ui-ux-pro-max` installed. Synced with GitHub. |
-| **Phase 1** | Project Initialization & Scaffolding | *READY* | NOT started yet — awaiting user's explicit signal |
-| **Phase 2** | Database Modeling & Seed Data | *PENDING* | User, ActivityRequest, Chat models with `2dsphere` index |
-| **Phase 3** | Authentication & User Profile | *PENDING* | JWT auth, bcrypt, profile editor |
-| **Phase 4** | Activity Requests & Geospatial API | *PENDING* | CRUD, `$near` radius search |
-| **Phase 5** | Multi-Variable Matching Engine | *PENDING* | Proximity + Interests + Schedule score algorithm |
-| **Phase 6** | Interactive Map & Bento UI | *PENDING* | Leaflet, radar circle, Bento cards |
-| **Phase 7** | Socket.IO Anonymous Chat & Handshake | *PENDING* | Real-time chat, pseudonyms, reveal handshake |
-| **Phase 8** | Notifications & Safety Moderation | *PENDING* | User blocking, reporting, live alerts |
-| **Phase 9** | Testing, Polish & Viva Prep | *PENDING* | End-to-end verification, demo walkthrough |
+| **Level 0** | Foundation, Cloud Credentials & Scaffolding | *READY* | Awaiting credentials (Supabase, Cloudinary, Google OAuth) |
+| **Level 1** | Supabase Auth, Google OAuth & Profiles | *PENDING* | Auth, Cloudinary avatar upload, profile editor |
+| **Level 2** | PostGIS Database & Activity Requests | *PENDING* | PostGIS tables, spatial radius query, request CRUD |
+| **Level 3** | Discovery Center & Interactive Map | *PENDING* | Leaflet, radar circle, Bento cards, category pills |
+| **Level 4** | Multi-Factor Algorithmic Matching | *PENDING* | Proximity + Interests + Schedule score algorithm |
+| **Level 5** | Anonymous Real-Time Chat & Handshake | *PENDING* | Realtime chat, pseudonyms, reveal handshake |
+| **Level 6** | Safety Controls, Notifications & Settings | *PENDING* | User blocking, reporting, live alerts |
+| **Level 7** | Polish, Responsive QA & Launch Readiness | *PENDING* | Mobile audit, skeleton loaders, launch test |
 
 ---
 

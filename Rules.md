@@ -26,12 +26,14 @@
 - **Interactive Mapping:** `leaflet` and `react-leaflet` with OpenStreetMap raster tiles (requires **zero API keys** and **no credit cards**).
 - **Networking & Real-Time:** `axios` for HTTP REST calls; `socket.io-client` for real-time WebSocket communication.
 
-### Backend Libraries
+### Backend & Cloud Infrastructure
 - **Runtime:** Node.js (v20+ / v22+).
-- **Web Server:** Express.js (`express`).
-- **Real-Time Gateway:** `socket.io` (v4+).
-- **Database Driver:** `mongoose` (v8+) connected to local or remote MongoDB.
-- **Authentication & Security:** `jsonwebtoken` (JWT), `bcryptjs`, `cors`, `helmet`.
+- **Backend Framework:** Express.js (`express`) for core algorithms (matching engine, identity reveal handshake).
+- **Database:** Supabase (Managed PostgreSQL with PostGIS extension for spatial queries).
+- **Client SDK:** `@supabase/supabase-js` (v2+).
+- **Authentication:** Supabase Auth (Email/Password & Google OAuth 2.0).
+- **Media & Photo Storage:** Cloudinary (CDN-optimized image delivery, face-centered cropping, auto-WebP transformations).
+- **Real-Time Gateway:** Supabase Realtime & Socket.IO (v4+).
 - **Environment Management:** `dotenv`.
 
 ---
@@ -41,12 +43,12 @@
 | Forbidden Technology | Reason for Prohibition | Approved Replacement |
 | :--- | :--- | :--- |
 | **jQuery** | Obsolete DOM manipulation; conflicts with React Virtual DOM | Native React state & hooks |
-| **Redux Boilerplate** | Massive overkill for this project scope; creates unnecessary complexity | React Context API (`AuthContext`, `SocketContext`, `GeoContext`) |
+| **Redux Boilerplate** | Massive overkill for this project scope; creates unnecessary complexity | React Context API (`AuthContext`, `GeoContext`, `ChatContext`) |
 | **Google Maps JS API** | Requires Google Cloud Billing account, credit card, and paid API keys | OpenStreetMap + Leaflet (`react-leaflet`) |
 | **Bootstrap / Material UI (MUI)** | Clunky, heavy CSS stylesheets that conflict with modern Tailwind & Bento aesthetics | Tailwind CSS + `shadcn/ui` + `Watermelon UI` |
-| **Raw SQL / SQLite** | Project specification and minor project synopsis mandate MongoDB with GeoJSON | MongoDB with Mongoose `2dsphere` |
+| **Local File System Storage for Images** | Inefficient, breaks in serverless/cloud environments | Cloudinary CDN |
 | **Emoji as Primary Icons** | Inconsistent rendering across Windows/Mac/Android, lacks accessibility | `lucide-react` SVGs |
-| **Inline Hardcoded Secrets** | Security vulnerability | `process.env` / `.env` variables |
+| **Inline Hardcoded Secrets** | Critical security vulnerability | `process.env` / `.env` variables |
 
 ---
 

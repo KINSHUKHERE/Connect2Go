@@ -53,18 +53,18 @@ Modern literature indicates that common interests and physical proximity catalyz
 
 ## 4. Comprehensive Specifications: 10 Core Modules
 
-### Module 1: User Registration & Authentication
-- **Registration:** Full Name, Email, Password, College/Affiliation, default location, and avatar.
-- **Password Security:** Salted and hashed using `bcryptjs` (minimum 10 salt rounds).
-- **JWT Authorization:** Issues signed JSON Web Tokens (7-day validity) with HTTP headers for stateless session validation.
-- **Session Validation:** Auto-login verification via `GET /api/auth/me`.
+### Module 1: User Registration, Supabase Auth & Google OAuth
+- **Authentication Providers:** Supabase Auth with Email/Password and native **Google OAuth 2.0** one-tap social login.
+- **Session Security:** Automatic JWT session tokens, PKCE refresh flow, secure cookie/localStorage persistence.
+- **Profile Media:** Direct, high-speed upload of user profile pictures to **Cloudinary CDN** with automatic face-centered cropping and responsive WebP delivery.
+- **Session Validation:** Auto-session rehydration via `supabase.auth.getSession()` on app startup.
 
 ### Module 2: User Profile & Interests Matrix
-- **Profile Fields:** Name, Bio, College/Institution, Age, Gender/Pronouns, Location (GeoJSON Point).
+- **Profile Fields:** Name, Username, Bio, Location (Latitude/Longitude & PostGIS Point), Cloudinary Avatar URL.
 - **Interest Taxonomy:**
   - *Sports:* Badminton, Cricket, Football, Table Tennis, Running, Cycling, Gym/Fitness, Yoga, Basketball, Volleyball, Chess.
   - *Tech & Academics:* Coding, Web Dev, AI/ML, Study Groups, Exam Prep, Robotics, Competitive Programming.
-  - *Hobbies & Social:* Gaming (Valorant, BGMI, FIFA), Music, Photography, Reading, Travel, Coffee Hangouts.
+  - *Hobbies & Social:* Gaming, Music, Photography, Reading, Travel, Coffee Hangouts, Food Exploration.
 - **Availability Schedule Matrix:** Configurable time slots:
   - Weekday Mornings (6 AM - 9 AM)
   - Weekday Evenings (5 PM - 9 PM)
@@ -75,22 +75,23 @@ Modern literature indicates that common interests and physical proximity catalyz
 ### Module 3: Activity Request Management
 - **Creation Form:**
   - Title (e.g., *"Looking for a badminton partner within 2 km"*).
-  - Category (Sports, Fitness, Study, Gaming, Outdoor, Social).
+  - Category (Sports, Fitness, Study, Gaming, Food, Travel, Others).
   - Description & Skill Level (*Beginner*, *Intermediate*, *Advanced*, *Open to All*).
   - Search Radius (0.5 km to 25 km slider).
-  - Location Point (GeoJSON `[longitude, latitude]`) with human-readable Landmark/Address.
+  - PostGIS Location Point (`[longitude, latitude]`) with Landmark/Address.
   - Activity Date & Time Window.
+  - Optional Activity Banner Image uploaded directly to **Cloudinary**.
   - Required Participants count (1 to 10).
 - **Lifecycle States:** `OPEN` -> `IN_DISCUSSION` -> `FILLED` -> `COMPLETED` / `CANCELLED`.
 - **User Actions:** Edit active request, mark as completed, cancel, delete.
 
 ### Module 4: Location-Based Discovery & Interactive Map
 - **HTML5 Geolocation API:** Acquires browser coordinates with seamless fallback to manual pin placement on map.
-- **MongoDB 2dsphere Indexing:** Utilizes `$near` and `$geoWithin` with `$centerSphere` for sub-100ms geospatial retrieval.
+- **Supabase PostGIS Spatial Indexing:** Utilizes `ST_DWithin` and `ST_Distance` on geography points for sub-50ms radius discovery queries.
 - **Interactive Map Engine (Leaflet):**
   - Live Radar / Radius Circle visualizer centered on the user, updating dynamically as the radius slider shifts.
   - Custom Map Markers distinguishing between open activity requests and nearby active users.
-  - Rich interactive marker popups with distance badges (e.g., *"0.8 km away"*), activity details, and instant *"Chat"* CTA.
+  - Rich interactive marker popups with distance badges (e.g., *"0.8 km away"*), activity details, and instant *"Join / Chat"* CTA.
 
 ### Module 5: Search, Sorting & Multi-Faceted Filters
 - **Filters:** By Category, Radius slider (0.5 km to 50 km), Schedule Date (Today, Tomorrow, Weekend), and Skill Level.
