@@ -116,7 +116,7 @@ CLOUDINARY_API_SECRET=your-cloudinary-api-secret
 
 ## 👨‍💻 Creator & Credits
 
-Developed with ❤️ by **Kinshuk Khandelwal**
+Developed by **Kinshuk Khandelwal**
 
 - 💼 **LinkedIn:** [linkedin.com/in/kinshuk-khandelwal-43024b290](https://www.linkedin.com/in/kinshuk-khandelwal-43024b290/)
 - 🐙 **GitHub:** [@KINSHUKHERE](https://github.com/KINSHUKHERE)
