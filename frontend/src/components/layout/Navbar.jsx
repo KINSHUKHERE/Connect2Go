@@ -15,6 +15,8 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useGeo } from '../../context/GeoContext.jsx';
 import { Button } from '../ui/Button.jsx';
 import { getSafeAvatar } from '../../utils/imageUtils.js';
+import { NotificationDropdown } from './NotificationDropdown.jsx';
+import { MessageDropdown } from './MessageDropdown.jsx';
 
 export function Navbar({ 
   activeTab, 
@@ -24,6 +26,7 @@ export function Navbar({
   onOpenCreate, 
   onOpenChat, 
   onOpenLocationPicker,
+  onOpenSettings,
   onComingSoon 
 }) {
   const { user, logout } = useAuth();
@@ -147,27 +150,18 @@ export function Navbar({
             <span className="truncate max-w-[140px]">{locationName}</span>
           </div>
 
-          {/* Dedicated Chat Icon Button */}
-          <button
-            onClick={onOpenChat}
-            className="w-9 h-9 rounded-full border border-border/80 flex items-center justify-center text-dark-muted hover:text-brand-600 hover:bg-brand-50/60 transition-colors relative group"
-            title="Anonymous Chat & Messages"
-            aria-label="Open Chat"
-          >
-            <MessageCircle className="w-4 h-4 text-slate-700 group-hover:text-brand-600 transition-colors" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-brand-500 ring-2 ring-white"></span>
-          </button>
+          {/* WhatsApp-Style Messages Popup & Direct Navigation */}
+          <MessageDropdown onOpenMessagesPage={() => handleSelectTab('messages')} />
 
-          {/* Notifications Button */}
-          <button
-            onClick={() => onComingSoon('Notifications Tray')}
-            className="w-9 h-9 rounded-full border border-border/80 flex items-center justify-center text-dark-muted hover:text-dark-text hover:bg-slate-50 transition-colors relative"
-            title="Notifications"
-            aria-label="Notifications"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-brand-500 ring-2 ring-white"></span>
-          </button>
+          {/* Live Activity & Safety Notifications Tray */}
+          <NotificationDropdown
+            onOpenChat={(peer) => onOpenChat && onOpenChat(peer)}
+            onSelectTab={handleSelectTab}
+            onOpenSettings={() => {
+              setProfileDropdownOpen(false);
+              onOpenSettings && onOpenSettings();
+            }}
+          />
 
           {/* Profile Bar with Hover & Click Dropdown */}
           <div 
@@ -256,18 +250,19 @@ export function Navbar({
                       </button>
 
                       <button
-                        onClick={() => {
-                          setProfileDropdownOpen(false);
-                          onComingSoon('Settings');
-                        }}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-dark-text hover:bg-slate-50 transition-colors"
+                        onClick={() => handleSelectTab('settings')}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                          activeTab === 'settings'
+                            ? 'bg-brand-50 text-brand-700 font-bold'
+                            : 'text-dark-text hover:bg-slate-50'
+                        }`}
                       >
                         <div className="flex items-center gap-2.5">
                           <Settings className="w-4 h-4 text-slate-500" />
-                          <span>Settings</span>
+                          <span>Settings & Privacy</span>
                         </div>
-                        <span className="text-[9px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded">
-                          Soon
+                        <span className="text-[9px] bg-brand-50 text-brand-700 font-bold px-1.5 py-0.5 rounded border border-brand-200">
+                          Active
                         </span>
                       </button>
 

@@ -34,14 +34,14 @@ export function BottomNavigation({ currentTab, setCurrentTab, onOpenCreate, onOp
       </button>
 
       <button
-        onClick={onOpenChat}
+        onClick={() => setCurrentTab('messages')}
         className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg transition-colors relative ${
           currentTab === 'messages' ? 'text-brand-600 font-bold' : 'text-dark-muted'
         }`}
       >
         <MessageCircle className="w-5 h-5" />
         <span className="text-[11px] font-medium">Chat</span>
-        <span className="absolute top-1 right-2 w-2 h-2 bg-brand-500 rounded-full"></span>
+        <span className="absolute top-1 right-2 w-2 h-2 bg-emerald-500 rounded-full"></span>
       </button>
 
       <button

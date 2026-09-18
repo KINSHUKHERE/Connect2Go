@@ -12,7 +12,8 @@ import {
   Search, 
   Loader2, 
   Clock, 
-  Calendar 
+  Calendar,
+  X 
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Tooltip, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -62,6 +63,17 @@ function FlyMapTo({ center }) {
       map.flyTo(center, 15, { duration: 0.8 });
     }
   }, [center, map]);
+  return null;
+}
+
+function MapResizeHandler() {
+  const map = useMap();
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [map]);
   return null;
 }
 
@@ -326,8 +338,21 @@ export function CreateRequestModal({ isOpen, onClose, onCreated }) {
                     placeholder="Search any place in India to place pin..."
                     value={locationSearch}
                     onChange={(e) => handleSearchLocations(e.target.value)}
-                    className="w-full h-8 pl-8 pr-3 bg-white border border-border rounded-lg text-[11px] focus:outline-none focus:border-brand-500"
+                    className="w-full h-8 pl-8 pr-7 bg-white border border-border rounded-lg text-[11px] focus:outline-none focus:border-brand-500"
                   />
+                  {locationSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocationSearch('');
+                        setSearchResults([]);
+                      }}
+                      className="absolute right-2 top-2 text-slate-400 hover:text-dark-text p-0.5 rounded"
+                      title="Clear search"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
                   {searchResults.length > 0 && (
                     <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-border rounded-xl shadow-lg z-50 max-h-36 overflow-y-auto divide-y divide-slate-100">
                       {searchResults.map((item) => (
@@ -343,20 +368,24 @@ export function CreateRequestModal({ isOpen, onClose, onCreated }) {
                   )}
                 </div>
 
-                <div className="w-full h-48 rounded-xl overflow-hidden border border-border relative z-10 shadow-inner">
+                <div className="w-full h-52 rounded-xl overflow-hidden border border-border relative z-10 shadow-inner">
                   {/* Floating Location Badge on Map */}
                   <div className="absolute top-2 left-2 z-[1000] bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-lg border border-brand-200/80 shadow-md flex items-center gap-1.5 max-w-[85%] pointer-events-none">
                     <span className="w-2 h-2 rounded-full bg-brand-500 animate-pulse shrink-0"></span>
                     <span className="text-[11px] font-bold text-dark-text truncate">
-                      📍 {locationLabel || 'Select meetup location'}
+                      📍 {meetupLocation || 'Select meetup location'}
                     </span>
                   </div>
 
                   <MapContainer
-                    center={[meetupCoords.lat, meetupCoords.lng]}
+                    center={[
+                      Number(meetupCoords?.lat) || 26.7725, 
+                      Number(meetupCoords?.lng) || 75.8753
+                    ]}
                     zoom={14}
                     scrollWheelZoom={true}
                     className="w-full h-full"
+                    style={{ height: '100%', width: '100%', minHeight: '200px' }}
                   >
                     <TileLayer
                       attribution={MAPBOX_ATTRIBUTION}
@@ -364,11 +393,21 @@ export function CreateRequestModal({ isOpen, onClose, onCreated }) {
                       tileSize={256}
                       maxZoom={20}
                     />
-                    <FlyMapTo center={[meetupCoords.lat, meetupCoords.lng]} />
+                    <MapResizeHandler />
+                    <FlyMapTo center={[
+                      Number(meetupCoords?.lat) || 26.7725, 
+                      Number(meetupCoords?.lng) || 75.8753
+                    ]} />
                     <MapEventsHandler onLocationSelect={handleMapClick} />
-                    <Marker position={[meetupCoords.lat, meetupCoords.lng]} icon={meetupPinIcon}>
+                    <Marker 
+                      position={[
+                        Number(meetupCoords?.lat) || 26.7725, 
+                        Number(meetupCoords?.lng) || 75.8753
+                      ]} 
+                      icon={meetupPinIcon}
+                    >
                       <Tooltip permanent direction="top" offset={[0, -28]} className="font-sans font-bold text-xs shadow-md">
-                        <span>📍 {locationLabel || 'Meetup spot'}</span>
+                        <span>📍 {meetupLocation || 'Meetup spot'}</span>
                       </Tooltip>
                     </Marker>
                   </MapContainer>

@@ -15,8 +15,10 @@ import {
 import { Button } from '../components/ui/Button.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
 import { handleImageError } from '../utils/imageUtils.js';
+import { useChat } from '../context/ChatContext.jsx';
 
-export function LandingPage({ onGetStarted, onExplore, onComingSoon }) {
+export function LandingPage({ onGetStarted, onExplore, onOpenMessages, onComingSoon }) {
+  const { repliedChatsCount } = useChat();
   const popularCategories = [
     { label: 'Badminton', icon: '🏸', count: '14 nearby', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
     { label: 'Morning Run', icon: '🏃', count: '22 nearby', color: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -345,6 +347,30 @@ export function LandingPage({ onGetStarted, onExplore, onComingSoon }) {
           </div>
         </div>
       </section>
+
+      {/* Floating Quick Messages Launcher on Home Page */}
+      <button
+        onClick={onOpenMessages || onExplore}
+        className="fixed bottom-6 right-6 z-30 hidden sm:flex items-center gap-3 bg-white/95 backdrop-blur-md hover:bg-white text-dark-text border border-border shadow-xl hover:shadow-2xl px-4 py-2.5 rounded-full transition-all duration-200 group active:scale-95 cursor-pointer"
+        title="Open Chats & Messages"
+      >
+        <div className="relative">
+          <div className="w-9 h-9 rounded-full bg-[#00a884] text-white flex items-center justify-center shadow-xs">
+            <MessageSquare className="w-4 h-4" />
+          </div>
+          {repliedChatsCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1 ring-2 ring-white animate-pulse">
+              {repliedChatsCount}
+            </span>
+          )}
+        </div>
+        <div className="text-left pr-1">
+          <div className="text-xs font-extrabold text-dark-text leading-tight">Messages</div>
+          <div className="text-[10px] text-[#00a884] font-bold">
+            {repliedChatsCount > 0 ? `${repliedChatsCount} chats with replies` : 'Active chats'}
+          </div>
+        </div>
+      </button>
 
     </div>
   );

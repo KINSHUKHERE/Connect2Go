@@ -117,6 +117,44 @@ export function AdminDashboardPage({ onBackToUserPanel, onComingSoon }) {
     { name: 'Rahul Jain', location: 'Jaipur, Rajasthan', joined: 'Joined 2 hours ago', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80' },
   ];
 
+  // Active search query filtering for admin data tables & widgets
+  const q = searchQuery.trim().toLowerCase();
+
+  const filteredRequests = recentRequests.filter((r) => {
+    if (!q) return true;
+    return (
+      r.name.toLowerCase().includes(q) ||
+      r.activity.toLowerCase().includes(q) ||
+      r.location.toLowerCase().includes(q) ||
+      r.status.toLowerCase().includes(q) ||
+      r.date.toLowerCase().includes(q)
+    );
+  });
+
+  const filteredReports = recentReports.filter((rep) => {
+    if (!q) return true;
+    return (
+      rep.title.toLowerCase().includes(q) ||
+      rep.user.toLowerCase().includes(q) ||
+      rep.status.toLowerCase().includes(q)
+    );
+  });
+
+  const filteredNewUsers = newUsers.filter((u) => {
+    if (!q) return true;
+    return (
+      u.name.toLowerCase().includes(q) ||
+      u.location.toLowerCase().includes(q) ||
+      u.joined.toLowerCase().includes(q)
+    );
+  });
+
+  const filteredLocations = topLocations.filter((loc) => {
+    if (!q) return true;
+    return loc.name.toLowerCase().includes(q);
+  });
+
+
   return (
     <div className="min-h-screen bg-[#F4F7F9] text-dark-text font-sans flex flex-col antialiased selection:bg-brand-100 selection:text-brand-900">
       
@@ -163,14 +201,23 @@ export function AdminDashboardPage({ onBackToUserPanel, onComingSoon }) {
         {/* Center: Search & Date Range */}
         <div className="hidden md:flex items-center gap-3 flex-1 max-w-xl mx-4">
           <div className="relative w-full">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search users, activities, reports..."
+              placeholder="Search users, activities, reports, locations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-9 pl-9 pr-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs text-dark-text placeholder:text-slate-400 focus:outline-none focus:border-brand-500 focus:bg-white"
+              className="w-full h-9 pl-9 pr-9 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs text-dark-text placeholder:text-slate-400 focus:outline-none focus:border-brand-500 focus:bg-white transition-colors"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-2 text-slate-400 hover:text-dark-text p-0.5 rounded"
+                title="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5 h-9 px-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs font-semibold text-slate-600 shrink-0 cursor-pointer hover:bg-slate-100">
@@ -317,13 +364,51 @@ export function AdminDashboardPage({ onBackToUserPanel, onComingSoon }) {
         <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden text-left">
           
           {/* Greeting Banner */}
-          <div className="pb-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-dark-text tracking-tight">
-              Good evening, Admin 👋
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
-              Here's what's happening on Connect2Go.
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-dark-text tracking-tight">
+                Good evening, Admin 👋
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
+                Here's what's happening on Connect2Go.
+              </p>
+            </div>
+
+            {/* Active search filter badge */}
+            {searchQuery && (
+              <div className="flex items-center gap-2 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-xl text-xs font-semibold text-brand-700 self-start sm:self-auto">
+                <Search className="w-3.5 h-3.5" />
+                <span>Filtering by: <strong className="text-dark-text">"{searchQuery}"</strong></span>
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="ml-1 p-0.5 hover:bg-brand-100 rounded text-brand-700"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Search Bar (Screen < md) */}
+          <div className="md:hidden relative w-full">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search users, activities, reports, locations..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-10 pl-9 pr-9 bg-white border border-[#E2E8F0] rounded-xl text-xs text-dark-text placeholder:text-slate-400 focus:outline-none focus:border-brand-500 shadow-2xs transition-colors"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-2.5 text-slate-400 hover:text-dark-text p-1 rounded"
+                title="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {/* Row 1: 4 KPI Cards */}
@@ -606,37 +691,54 @@ export function AdminDashboardPage({ onBackToUserPanel, onComingSoon }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F1F5F9]">
-                    {recentRequests.map((r) => (
-                      <tr key={r.id} className="hover:bg-[#F8FAFC] transition-colors">
-                        <td className="p-3.5 font-bold text-slate-400">{r.id}</td>
-                        <td className="p-3.5">
-                          <div className="flex items-center gap-2.5">
-                            <img src={r.avatar} alt={r.name} className="w-7 h-7 rounded-full object-cover ring-1 ring-slate-200" />
-                            <span className="font-bold text-dark-text">{r.name}</span>
+                    {filteredRequests.length > 0 ? (
+                      filteredRequests.map((r) => (
+                        <tr key={r.id} className="hover:bg-[#F8FAFC] transition-colors">
+                          <td className="p-3.5 font-bold text-slate-400">{r.id}</td>
+                          <td className="p-3.5">
+                            <div className="flex items-center gap-2.5">
+                              <img src={r.avatar} alt={r.name} className="w-7 h-7 rounded-full object-cover ring-1 ring-slate-200" />
+                              <span className="font-bold text-dark-text">{r.name}</span>
+                            </div>
+                          </td>
+                          <td className="p-3.5 font-medium text-dark-text">
+                            <span className="mr-1">{r.icon}</span>
+                            {r.activity}
+                          </td>
+                          <td className="p-3.5 text-slate-600 font-medium">{r.location}</td>
+                          <td className="p-3.5 text-slate-500">{r.date}</td>
+                          <td className="p-3.5 font-bold text-dark-text">{r.interested}</td>
+                          <td className="p-3.5">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-50 text-brand-700 border border-brand-200">
+                              {r.status}
+                            </span>
+                          </td>
+                          <td className="p-3.5 text-right">
+                            <button 
+                              onClick={() => onComingSoon(`Manage Request #${r.id}`)}
+                              className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                            >
+                              <MoreHorizontal className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="8" className="p-8 text-center bg-slate-50/50">
+                          <div className="flex flex-col items-center justify-center space-y-2">
+                            <Search className="w-6 h-6 text-slate-300" />
+                            <p className="text-xs font-bold text-slate-600">No activity requests matching "{searchQuery}"</p>
+                            <button
+                              onClick={() => setSearchQuery('')}
+                              className="text-[11px] font-bold text-brand-600 hover:text-brand-700 hover:underline"
+                            >
+                              Clear search query
+                            </button>
                           </div>
                         </td>
-                        <td className="p-3.5 font-medium text-dark-text">
-                          <span className="mr-1">{r.icon}</span>
-                          {r.activity}
-                        </td>
-                        <td className="p-3.5 text-slate-600 font-medium">{r.location}</td>
-                        <td className="p-3.5 text-slate-500">{r.date}</td>
-                        <td className="p-3.5 font-bold text-dark-text">{r.interested}</td>
-                        <td className="p-3.5">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-50 text-brand-700 border border-brand-200">
-                            {r.status}
-                          </span>
-                        </td>
-                        <td className="p-3.5 text-right">
-                          <button 
-                            onClick={() => onComingSoon(`Manage Request #${r.id}`)}
-                            className="p-1 rounded hover:bg-slate-100 text-slate-500"
-                          >
-                            <MoreHorizontal className="w-4 h-4" />
-                          </button>
-                        </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -656,19 +758,32 @@ export function AdminDashboardPage({ onBackToUserPanel, onComingSoon }) {
                 </div>
 
                 <div className="divide-y divide-slate-100">
-                  {recentReports.map((rep) => (
-                    <div key={rep.id} className="p-3.5 flex items-center justify-between gap-3 text-xs">
-                      <div className="space-y-0.5 truncate">
-                        <div className="font-bold text-dark-text truncate">{rep.title}</div>
-                        <div className="text-[11px] text-slate-400">
-                          User: <span className="font-semibold text-slate-600">{rep.user}</span> • {rep.time}
+                  {filteredReports.length > 0 ? (
+                    filteredReports.map((rep) => (
+                      <div key={rep.id} className="p-3.5 flex items-center justify-between gap-3 text-xs hover:bg-[#F8FAFC] transition-colors">
+                        <div className="space-y-0.5 truncate">
+                          <div className="font-bold text-dark-text truncate">{rep.title}</div>
+                          <div className="text-[11px] text-slate-400">
+                            User: <span className="font-semibold text-slate-600">{rep.user}</span> • {rep.time}
+                          </div>
                         </div>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${rep.statusColor}`}>
+                          {rep.status}
+                        </span>
                       </div>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${rep.statusColor}`}>
-                        {rep.status}
-                      </span>
+                    ))
+                  ) : (
+                    <div className="p-6 text-center space-y-2">
+                      <Search className="w-5 h-5 text-slate-300 mx-auto" />
+                      <p className="text-xs font-bold text-slate-600">No reports matching "{searchQuery}"</p>
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="text-[11px] font-bold text-brand-600 hover:underline"
+                      >
+                        Clear search
+                      </button>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
 
@@ -700,20 +815,26 @@ export function AdminDashboardPage({ onBackToUserPanel, onComingSoon }) {
               </div>
 
               <div className="space-y-3 pt-1">
-                {topLocations.map((loc, idx) => (
-                  <div key={loc.name} className="space-y-1 text-xs">
-                    <div className="flex items-center justify-between font-bold">
-                      <span className="text-dark-text">{idx + 1}. {loc.name}</span>
-                      <span className="text-slate-500">{loc.count}</span>
+                {filteredLocations.length > 0 ? (
+                  filteredLocations.map((loc, idx) => (
+                    <div key={loc.name} className="space-y-1 text-xs">
+                      <div className="flex items-center justify-between font-bold">
+                        <span className="text-dark-text">{idx + 1}. {loc.name}</span>
+                        <span className="text-slate-500">{loc.count}</span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-brand-500 rounded-full" 
+                          style={{ width: `${loc.percent}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-brand-500 rounded-full" 
-                        style={{ width: `${loc.percent}%` }}
-                      />
-                    </div>
+                  ))
+                ) : (
+                  <div className="p-4 text-center text-xs text-slate-400">
+                    No locations matching "{searchQuery}"
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
@@ -730,15 +851,28 @@ export function AdminDashboardPage({ onBackToUserPanel, onComingSoon }) {
               </div>
 
               <div className="space-y-3 pt-1">
-                {newUsers.map((u) => (
-                  <div key={u.name} className="flex items-center gap-3 text-xs">
-                    <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover" />
-                    <div className="truncate flex-1">
-                      <div className="font-bold text-dark-text truncate">{u.name}</div>
-                      <div className="text-[11px] text-slate-400 truncate">{u.location} • {u.joined}</div>
+                {filteredNewUsers.length > 0 ? (
+                  filteredNewUsers.map((u) => (
+                    <div key={u.name} className="flex items-center gap-3 text-xs hover:bg-[#F8FAFC] p-1.5 rounded-xl transition-colors">
+                      <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover" />
+                      <div className="truncate flex-1">
+                        <div className="font-bold text-dark-text truncate">{u.name}</div>
+                        <div className="text-[11px] text-slate-400 truncate">{u.location} • {u.joined}</div>
+                      </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="p-6 text-center space-y-2">
+                    <Search className="w-5 h-5 text-slate-300 mx-auto" />
+                    <p className="text-xs font-bold text-slate-600">No users matching "{searchQuery}"</p>
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="text-[11px] font-bold text-brand-600 hover:underline"
+                    >
+                      Clear search
+                    </button>
                   </div>
-                ))}
+                )}
               </div>
             </div>
 

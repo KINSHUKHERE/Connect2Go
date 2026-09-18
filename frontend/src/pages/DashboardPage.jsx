@@ -23,6 +23,7 @@ import { MapView } from '../components/map/MapView.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
 import { getSafeAvatar, handleAvatarError } from '../utils/imageUtils.js';
+import { calculateCompatibility } from '../utils/matchingEngine.js';
 
 export function DashboardPage({ onOpenCreate, onJoinActivity, onOpenLocationPicker, onComingSoon }) {
   const { 
@@ -64,11 +65,15 @@ export function DashboardPage({ onOpenCreate, onJoinActivity, onOpenLocationPick
   // Filter activities
   const filteredActivities = activities.filter((act) => {
     const matchesCategory = selectedCategory === 'All' || act.category === selectedCategory;
-    const matchesSearch = 
-      act.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (act.description && act.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      act.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (act.locationName && act.locationName.toLowerCase().includes(searchQuery.toLowerCase()));
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch = !q ||
+      act.title.toLowerCase().includes(q) ||
+      (act.description && act.description.toLowerCase().includes(q)) ||
+      act.category.toLowerCase().includes(q) ||
+      (act.locationName && act.locationName.toLowerCase().includes(q)) ||
+      (act.creator?.name && act.creator.name.toLowerCase().includes(q)) ||
+      (act.creator_name && act.creator_name.toLowerCase().includes(q)) ||
+      (act.tags && act.tags.some((t) => t.toLowerCase().includes(q)));
 
     // Date Filter
     let matchesDate = true;
@@ -95,7 +100,9 @@ export function DashboardPage({ onOpenCreate, onJoinActivity, onOpenLocationPick
       return (a.distanceKm || a.distance_km || 1) - (b.distanceKm || b.distance_km || 1);
     }
     if (sortBy === 'match') {
-      return (b.matchScore || 80) - (a.matchScore || 80);
+      const scoreA = a.compatibility?.score ?? calculateCompatibility(user, a, 'activity').score;
+      const scoreB = b.compatibility?.score ?? calculateCompatibility(user, b, 'activity').score;
+      return scoreB - scoreA;
     }
     return 0; // default
   });
@@ -149,11 +156,20 @@ export function DashboardPage({ onOpenCreate, onJoinActivity, onOpenLocationPick
             <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-dark-faint pointer-events-none" />
             <input
               type="text"
-              placeholder="Search activities, sports, or places..."
+              placeholder="Search activities, sports, places, or hosts..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-11 pl-10 pr-4 bg-slate-50 border border-border rounded-xl text-xs sm:text-sm text-dark-text placeholder:text-dark-faint focus:outline-none focus:border-brand-500 focus:bg-white transition-colors"
+              className="w-full h-11 pl-10 pr-9 bg-slate-50 border border-border rounded-xl text-xs sm:text-sm text-dark-text placeholder:text-dark-faint focus:outline-none focus:border-brand-500 focus:bg-white transition-colors"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-3 text-slate-400 hover:text-dark-text p-0.5 rounded"
+                title="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {/* Location Picker with Live GPS button & Map Modal */}

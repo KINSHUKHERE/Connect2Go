@@ -10,6 +10,10 @@ import { MyActivitiesPage } from './pages/MyActivitiesPage.jsx';
 import { MatchesPage } from './pages/MatchesPage.jsx';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage.jsx';
 import { TrustLegalPage } from './pages/TrustLegalPage.jsx';
+import { ProfilePage } from './pages/ProfilePage.jsx';
+import { SettingsPage } from './pages/SettingsPage.jsx';
+import { MessagesPage } from './pages/MessagesPage.jsx';
+import { ChatProvider, useChat } from './context/ChatContext.jsx';
 import { CreateRequestModal } from './components/requests/CreateRequestModal.jsx';
 import { ChatDrawer } from './components/chat/ChatDrawer.jsx';
 import { ReportModal } from './components/safety/ReportModal.jsx';
@@ -19,6 +23,7 @@ import { Badge } from './components/ui/Badge.jsx';
 import { Footer } from './components/layout/Footer.jsx';
 import { LegalModal } from './components/safety/LegalModal.jsx';
 import { LocationPickerModal } from './components/map/LocationPickerModal.jsx';
+import { SettingsModal } from './components/settings/SettingsModal.jsx';
 import { Sparkles, Shield, MapPin, Check } from 'lucide-react';
 import { getSafeAvatar, handleAvatarError } from './utils/imageUtils.js';
 
@@ -46,6 +51,7 @@ function MainApp() {
   const [reportModal, setReportModal] = useState({ isOpen: false, targetUser: '' });
   const [legalModal, setLegalModal] = useState({ isOpen: false, tab: 'terms' });
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Auth Modal State
   const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup'
@@ -53,19 +59,61 @@ function MainApp() {
   const [authPassword, setAuthPassword] = useState('');
   const [authName, setAuthName] = useState('');
 
-  // Listen to browser URL navigation
-  useEffect(() => {
-    const handleLocationChange = () => {
-      setCurrentPath(window.location.pathname);
-    };
-    window.addEventListener('popstate', handleLocationChange);
-    return () => window.removeEventListener('popstate', handleLocationChange);
-  }, []);
+  // Access central Chat Context
+  const { openOrCreateConversationWithPeer } = useChat();
 
   const navigateTo = (path) => {
     window.history.pushState({}, '', path);
     setCurrentPath(path);
   };
+
+  const handleSelectTab = (tab) => {
+    setActiveTab(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const targetPath = tab === 'home' ? '/' : `/${tab}`;
+    navigateTo(targetPath);
+  };
+
+  // Listen to browser URL navigation & initial path sync
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const path = window.location.pathname;
+      setCurrentPath(path);
+      const cleanPath = path.replace(/^\//, '');
+      const validTabs = ['explore', 'my-activities', 'matches', 'messages', 'profile', 'safety', 'settings', 'terms', 'privacy'];
+      if (validTabs.includes(cleanPath)) {
+        setActiveTab(cleanPath);
+      } else if (path === '/' || cleanPath === '') {
+        setActiveTab('home');
+      }
+    };
+    window.addEventListener('popstate', handleLocationChange);
+    handleLocationChange();
+    return () => window.removeEventListener('popstate', handleLocationChange);
+  }, []);
+
+  // Dynamic Browser Document Title on Every Page
+  useEffect(() => {
+    if (currentPath.startsWith('/admin')) {
+      document.title = 'Admin Operations Hub — Connect2Go';
+      return;
+    }
+
+    const titleMap = {
+      'home': 'Connect2Go — Discover Nearby Activities & Socialize',
+      'explore': 'Explore Activities — Connect2Go',
+      'my-activities': 'My Activities & Hosted Events — Connect2Go',
+      'matches': 'Matched Peers & Activity Partners — Connect2Go',
+      'messages': 'Messages & Live Chat — Connect2Go',
+      'profile': 'My Profile — Connect2Go',
+      'safety': 'Safety & Trust Center — Connect2Go',
+      'settings': 'Settings & Privacy Hub — Connect2Go',
+      'terms': 'Terms & Conditions — Connect2Go',
+      'privacy': 'Privacy Policy — Connect2Go',
+    };
+
+    document.title = titleMap[activeTab] || 'Connect2Go — Live Activity Partner Platform';
+  }, [activeTab, currentPath]);
 
   const handleOpenComingSoon = (featureName) => {
     setComingSoonModal({ isOpen: true, featureName });
@@ -76,13 +124,19 @@ function MainApp() {
   };
 
   const handleOpenLegal = (tab = 'terms') => {
-    setActiveTab(tab);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    handleSelectTab(tab);
   };
 
   const handleJoinActivity = (activity) => {
-    setChatPeer(activity.creator?.name || activity.creator_name || 'Partner');
-    setIsChatOpen(true);
+    const peerData = activity?.creator || (activity?.name ? activity : {
+      name: activity?.creator_name || 'Partner',
+      avatar: activity?.creator_avatar,
+      title: activity?.title,
+      category: activity?.category,
+    });
+    setChatPeer(peerData);
+    openOrCreateConversationWithPeer(peerData);
+    handleSelectTab('messages');
   };
 
   // ==========================================
@@ -106,15 +160,13 @@ function MainApp() {
       {/* Top Navigation */}
       <Navbar
         activeTab={activeTab}
-        setActiveTab={(tab) => {
-          setActiveTab(tab);
-          if (tab === 'home') navigateTo('/');
-        }}
+        setActiveTab={handleSelectTab}
         onNavigate={navigateTo}
         onOpenAuth={() => setAuthModalOpen(true)}
         onOpenCreate={() => setIsCreateModalOpen(true)}
-        onOpenChat={() => setIsChatOpen(true)}
+        onOpenChat={() => handleSelectTab('messages')}
         onOpenLocationPicker={() => setIsLocationModalOpen(true)}
+        onOpenSettings={() => handleSelectTab('settings')}
         onComingSoon={handleOpenComingSoon}
       />
 
@@ -122,8 +174,9 @@ function MainApp() {
       <main className="flex-1 w-full px-4 sm:px-6 lg:px-10 py-6">
           {activeTab === 'home' && (
             <LandingPage
-              onGetStarted={() => setActiveTab('explore')}
-              onExplore={() => setActiveTab('explore')}
+              onGetStarted={() => handleSelectTab('explore')}
+              onExplore={() => handleSelectTab('explore')}
+              onOpenMessages={() => handleSelectTab('messages')}
               onComingSoon={handleOpenComingSoon}
             />
           )}
@@ -153,89 +206,38 @@ function MainApp() {
             />
           )}
 
-          {/* User Profile View */}
-          {activeTab === 'profile' && user && (
-            <div className="bg-white rounded-2xl border border-border/80 shadow-soft p-6 sm:p-8 text-left space-y-6 max-w-2xl mx-auto">
-              <div className="flex items-center gap-4 pb-6 border-b border-border/70">
-                <img
-                  src={getSafeAvatar(user.name, user.avatar)}
-                  alt={user.name}
-                  onError={(e) => handleAvatarError(e, user.name)}
-                  className="w-20 h-20 rounded-full object-cover ring-4 ring-brand-100 bg-slate-100"
-                />
-                <div>
-                  <h2 className="text-xl font-bold text-dark-text">{user.name}</h2>
-                  <p className="text-xs text-brand-600 font-semibold">@{user.username || 'user'}</p>
-                  <p className="text-xs text-dark-muted flex items-center gap-1 mt-1">
-                    <MapPin className="w-3.5 h-3.5" />
-                    {user.location || 'Jaipur, Rajasthan'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Stats Row */}
-              <div className="grid grid-cols-3 gap-4 py-2 bg-slate-50 rounded-xl p-3 text-center">
-                <div>
-                  <div className="text-lg font-bold text-dark-text">{user.stats?.activities || 12}</div>
-                  <div className="text-[11px] text-dark-faint">Activities</div>
-                </div>
-                <div>
-                  <div className="text-lg font-bold text-dark-text">{user.stats?.matches || 8}</div>
-                  <div className="text-[11px] text-dark-faint">Matches</div>
-                </div>
-                <div>
-                  <div className="text-lg font-bold text-dark-text">{user.stats?.connections || 24}</div>
-                  <div className="text-[11px] text-dark-faint">Connections</div>
-                </div>
-              </div>
-
-              {/* Bio & Interests */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold text-dark-muted tracking-wider uppercase">About</h4>
-                <p className="text-xs sm:text-sm text-dark-text leading-relaxed">
-                  {user.bio || 'Ready to explore activities nearby!'}
-                </p>
-                
-                <h4 className="text-xs font-bold text-dark-muted tracking-wider uppercase pt-2">Hobby & Activity Interests</h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {(user.interests || ['Badminton', 'Running', 'Gaming', 'Music']).map((interest) => (
-                    <Badge key={interest} variant="default" className="text-xs">
-                      {interest}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div className="pt-4 flex gap-3">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => handleOpenComingSoon('Edit Profile & Upload Cloudinary Photo')}
-                  className="font-bold text-xs"
-                >
-                  Edit Profile
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleOpenComingSoon('Settings & Privacy Controls')}
-                  className="text-xs"
-                >
-                  Privacy Settings
-                </Button>
-              </div>
-            </div>
+          {/* Dedicated Full Page: Messages & Live Chat */}
+          {activeTab === 'messages' && (
+            <MessagesPage
+              onNavigate={navigateTo}
+              onOpenSafety={() => handleSelectTab('safety')}
+            />
           )}
 
-          {/* Dedicated Full Page for Safety & Trust Center, Terms & Conditions, Privacy Policy */}
+          {/* Dedicated Full Page: My Profile */}
+          {activeTab === 'profile' && (
+            <ProfilePage
+              onNavigate={navigateTo}
+              onOpenSettings={() => handleSelectTab('settings')}
+              onOpenSafety={() => handleSelectTab('safety')}
+              onComingSoon={handleOpenComingSoon}
+            />
+          )}
+
+          {/* Dedicated Full Page: Safety & Trust Center, Terms & Privacy */}
           {(activeTab === 'safety' || activeTab === 'terms' || activeTab === 'privacy') && (
             <TrustLegalPage
               initialTab={activeTab}
-              onNavigateHome={() => {
-                setActiveTab('home');
-                navigateTo('/');
-              }}
+              onNavigateHome={() => handleSelectTab('home')}
               onOpenReport={() => handleOpenReport('General Member')}
+            />
+          )}
+
+          {/* Dedicated Full Page: Settings & Privacy Hub */}
+          {activeTab === 'settings' && (
+            <SettingsPage
+              onNavigate={navigateTo}
+              onOpenSafety={() => handleSelectTab('safety')}
             />
           )}
 
@@ -245,10 +247,7 @@ function MainApp() {
       {activeTab === 'home' && (
         <Footer
           onNavigate={navigateTo}
-          onSelectTab={(tab) => {
-            setActiveTab(tab);
-            if (tab === 'home') navigateTo('/');
-          }}
+          onSelectTab={handleSelectTab}
           onOpenCreate={() => setIsCreateModalOpen(true)}
           onOpenTerms={() => handleOpenLegal('terms')}
           onOpenPrivacy={() => handleOpenLegal('privacy')}
@@ -259,9 +258,9 @@ function MainApp() {
       {/* Mobile Bottom Navigation */}
       <BottomNavigation
         currentTab={activeTab}
-        setCurrentTab={setActiveTab}
+        setCurrentTab={handleSelectTab}
         onOpenCreate={() => setIsCreateModalOpen(true)}
-        onOpenChat={() => setIsChatOpen(true)}
+        onOpenChat={() => handleSelectTab('messages')}
       />
 
       {/* Create Activity Modal */}
@@ -271,12 +270,20 @@ function MainApp() {
         onCreated={() => setActiveTab('explore')}
       />
 
-      {/* Anonymous Real-Time Chat Drawer */}
+      {/* Anonymous Real-Time Chat Drawer with Dual Reveal Handshake */}
       <ChatDrawer
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
-        peerName={chatPeer}
+        peer={chatPeer}
+        peerName={typeof chatPeer === 'string' ? chatPeer : chatPeer?.name || 'Rohan'}
         onComingSoon={handleOpenComingSoon}
+      />
+
+      {/* Preferences & Privacy Fuzzing Hub Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        user={user}
       />
 
       {/* Safety Report Modal */}
@@ -462,7 +469,9 @@ export default function App() {
     <ToastProvider>
       <AuthProvider>
         <GeoProvider>
-          <MainApp />
+          <ChatProvider>
+            <MainApp />
+          </ChatProvider>
         </GeoProvider>
       </AuthProvider>
     </ToastProvider>

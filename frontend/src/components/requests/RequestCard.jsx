@@ -3,12 +3,17 @@ import { MapPin, Clock, Users, Heart, Sparkles } from 'lucide-react';
 import { Badge } from '../ui/Badge.jsx';
 import { Button } from '../ui/Button.jsx';
 import { getActivityImage, getSafeAvatar, handleImageError, handleAvatarError } from '../../utils/imageUtils.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { calculateCompatibility } from '../../utils/matchingEngine.js';
 
 export function RequestCard({ activity, onJoin, onComingSoon }) {
+  const { user } = useAuth();
   const [isFavorited, setIsFavorited] = React.useState(false);
   const creatorName = activity.creator?.name || activity.creator_name || 'Member';
   const creatorAvatar = activity.creator?.avatar || activity.creator_avatar;
   const cardImage = getActivityImage(activity);
+
+  const compatibility = activity.compatibility || calculateCompatibility(user, activity, 'activity');
 
   return (
     <div className="bg-white rounded-lg border border-border/80 overflow-hidden shadow-soft hover:shadow-soft-hover transition-all duration-200 group flex flex-col justify-between">
@@ -39,13 +44,19 @@ export function RequestCard({ activity, onJoin, onComingSoon }) {
           <Heart className={`w-4 h-4 ${isFavorited ? 'fill-red-500 text-red-500' : ''}`} />
         </button>
 
-        {/* Match Score Pill */}
-        {activity.matchScore && (
-          <div className="absolute bottom-3 left-3 flex items-center gap-1 px-2.5 py-1 bg-brand-500 text-white rounded-full text-xs font-bold shadow-xs">
-            <Sparkles className="w-3 h-3 fill-white" />
-            <span>{activity.matchScore}% Match</span>
-          </div>
-        )}
+        {/* Dynamic Compatibility Score Pill */}
+        <div
+          className={`absolute bottom-3 left-3 flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold shadow-md backdrop-blur-md ${
+            compatibility.score >= 85
+              ? 'bg-emerald-600/95 text-white ring-1 ring-white/30'
+              : compatibility.score >= 70
+              ? 'bg-brand-600/95 text-white'
+              : 'bg-slate-900/85 text-slate-100'
+          }`}
+        >
+          <Sparkles className="w-3 h-3 fill-white" />
+          <span>{compatibility.score}% Match</span>
+        </div>
       </div>
 
       {/* Card Content Body */}
@@ -66,7 +77,13 @@ export function RequestCard({ activity, onJoin, onComingSoon }) {
             {activity.title}
           </h3>
 
-          <p className="text-xs text-dark-muted mt-1 line-clamp-2 leading-relaxed">
+          {compatibility.highlight && (
+            <div className="flex items-center gap-1.5 mt-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md w-fit">
+              <span>✨ {compatibility.highlight}</span>
+            </div>
+          )}
+
+          <p className="text-xs text-dark-muted mt-1.5 line-clamp-2 leading-relaxed">
             {activity.description}
           </p>
         </div>

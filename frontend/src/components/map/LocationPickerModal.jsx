@@ -205,6 +205,19 @@ export function LocationPickerModal({ isOpen, onClose }) {
             {isSearching && (
               <Loader2 className="w-3.5 h-3.5 text-brand-600 animate-spin absolute right-3.5" />
             )}
+            {searchQuery && !isSearching && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSearchResults([]);
+                }}
+                className="absolute right-3.5 text-slate-400 hover:text-dark-text p-0.5 rounded"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Search Dropdown */}
