@@ -54,9 +54,29 @@ graph TD
 
 ---
 
-## 2. End-to-End User Experience & Data Flows
+## 2. Dual Panel Architecture: User Panel vs. Admin Panel
 
-### 2.1 The Complete User Journey Flow
+Connect2Go is architected with two separate panels, each with its own isolated URL paths, interfaces, and permissions:
+
+```
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│                                CONNECT2GO PLATFORM                                │
+├────────────────────────────────────────┬──────────────────────────────────────────┤
+│           USER PANEL (Public & Auth)   │            ADMIN PANEL (Admin-Only)      │
+├────────────────────────────────────────┼──────────────────────────────────────────┤
+│  URLs:                                 │  URLs:                                   │
+│  • `/` (Landing & Discovery Dashboard) │  • `/admin/login` (Secure Admin Login)   │
+│  • `/explore` (Interactive Map & Bento)│  • `/admin` or `/admin/dashboard` (Stats)│
+│  • `/create` (Post Activity Request)   │  • `/admin/users` (User Management)      │
+│  • `/messages` (Anonymous Real-Time)   │  • `/admin/activities` (Post Moderation) │
+│  • `/profile` (Interests & Availability│  • `/admin/reports` (Safety Moderation)  │
+│  • `/settings` (Privacy & Fuzzing)     │  • `/admin/analytics` (Platform Metrics) │
+├────────────────────────────────────────┼──────────────────────────────────────────┤
+│  Audience: General Users & Students    │  Audience: Platform Administrators       │
+│  Theme: Calm Gen-Z Green & Mint        │  Theme: Clean Slate Management Dashboard │
+│  Auth: Supabase Auth / Google OAuth    │  Auth: Supabase Role Verification (Admin)│
+└────────────────────────────────────────┴──────────────────────────────────────────┘
+```
 ```
 1. DISCOVERY & ONBOARDING
    User Lands ➔ Authenticates via Supabase (Email or Google OAuth) 
