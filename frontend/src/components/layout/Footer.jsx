@@ -10,7 +10,8 @@ import {
   FileText, 
   Lock, 
   Sparkles,
-  MapPin
+  MapPin,
+  Globe
 } from 'lucide-react';
 
 export function Footer({ 
@@ -180,7 +181,18 @@ export function Footer({
             </p>
 
             {/* Social Links */}
-            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+            <div className="flex flex-wrap gap-2 pt-1">
+              {/* Portfolio Button */}
+              <a
+                href="https://kinshukkhandelwal.qzz.io/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 rounded-xl text-xs font-bold shadow-xs transition-all hover:shadow"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span>Portfolio</span>
+              </a>
+
               {/* LinkedIn Button */}
               <a
                 href="https://www.linkedin.com/in/kinshuk-khandelwal-43024b290/"
@@ -217,7 +229,7 @@ export function Footer({
         <p>
           © 2026 <span className="font-bold text-dark-text">Connect2Go</span>. Developed with care by{' '}
           <a
-            href="https://www.linkedin.com/in/kinshuk-khandelwal-43024b290/"
+            href="https://kinshukkhandelwal.qzz.io/"
             target="_blank"
             rel="noopener noreferrer"
             className="font-bold text-brand-600 hover:underline"

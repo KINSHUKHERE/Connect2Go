@@ -164,6 +164,7 @@ CLOUDINARY_API_SECRET=your-cloudinary-api-secret
 
 Developed by **Kinshuk Khandelwal**
 
+- 🌐 **Portfolio:** [kinshukkhandelwal.qzz.io](https://kinshukkhandelwal.qzz.io/)
 - 💼 **LinkedIn:** [linkedin.com/in/kinshuk-khandelwal-43024b290](https://www.linkedin.com/in/kinshuk-khandelwal-43024b290/)
 - 🐙 **GitHub:** [@KINSHUKHERE](https://github.com/KINSHUKHERE)
 
