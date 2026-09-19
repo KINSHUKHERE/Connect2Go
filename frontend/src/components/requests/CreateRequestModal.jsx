@@ -174,8 +174,8 @@ export function CreateRequestModal({ isOpen, onClose, onCreated }) {
       participantCount: parseInt(maxParticipants, 10) || 4,
       joinedCount: 1,
       creator: {
-        name: user ? user.name : 'Kinshuk',
-        avatar: user ? user.avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+        name: user ? user.name : 'Host',
+        avatar: user ? user.avatar : 'https://api.dicebear.com/7.x/avataaars/svg?seed=Host&backgroundColor=e2e8f0,cbd5e1',
         badge: 'Host'
       },
       imageUrl: bannerImage,

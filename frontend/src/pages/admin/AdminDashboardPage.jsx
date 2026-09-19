@@ -35,8 +35,10 @@ import {
 import { Badge } from '../../components/ui/Badge.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { ComingSoon } from '../../components/ui/ComingSoon.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 export function AdminDashboardPage({ onBackToUserPanel, onComingSoon }) {
+  const { user, logout } = useAuth();
   const [currentNav, setCurrentNav] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -55,9 +57,13 @@ export function AdminDashboardPage({ onBackToUserPanel, onComingSoon }) {
     criticalIssues: 0
   });
 
-  // Attempt to fetch real counts from backend
+  // Attempt to fetch real counts from backend with admin security header
   useEffect(() => {
-    fetch('http://localhost:5000/api/admin/metrics')
+    fetch('http://localhost:5000/api/admin/metrics', {
+      headers: {
+        'x-admin-email': user?.email || 'herekinshuk@gmail.com'
+      }
+    })
       .then(res => res.json())
       .then(data => {
         if (data?.success && data?.metrics) {
@@ -70,7 +76,7 @@ export function AdminDashboardPage({ onBackToUserPanel, onComingSoon }) {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [user]);
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -238,15 +244,19 @@ export function AdminDashboardPage({ onBackToUserPanel, onComingSoon }) {
           </button>
 
           {/* Admin Avatar Pill */}
-          <div className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC]">
+          <div className="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC]">
             <img
-              src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80"
+              src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"}
               alt="Admin"
-              className="w-7 h-7 rounded-full object-cover"
+              className="w-7 h-7 rounded-full object-cover ring-1 ring-brand-500/40"
             />
             <div className="hidden sm:flex flex-col text-left leading-tight">
-              <span className="text-xs font-bold text-dark-text">Admin</span>
-              <span className="text-[10px] text-slate-400">Super Admin</span>
+              <span className="text-xs font-bold text-dark-text truncate max-w-[130px]">
+                {user?.name || 'Kinshuk Khandelwal'}
+              </span>
+              <span className="text-[10px] text-slate-500 truncate max-w-[130px]">
+                {user?.email || 'herekinshuk@gmail.com'}
+              </span>
             </div>
           </div>
 
@@ -334,11 +344,14 @@ export function AdminDashboardPage({ onBackToUserPanel, onComingSoon }) {
             </button>
 
             <button
-              onClick={onBackToUserPanel}
+              onClick={async () => {
+                if (logout) await logout();
+                if (onBackToUserPanel) onBackToUserPanel();
+              }}
               title={isSidebarCollapsed ? "Logout" : undefined}
               className={`w-full flex items-center ${
                 isSidebarCollapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3.5 py-2.5'
-              } rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors text-left relative group`}
+              } rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors text-left relative group cursor-pointer`}
             >
               <LogOut className="w-4 h-4 text-red-500 shrink-0" />
               {!isSidebarCollapsed && <span>Logout</span>}

@@ -17,13 +17,14 @@ import {
   AlertCircle,
   X
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import { useChat } from '../context/ChatContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
 import { getSafeAvatar } from '../utils/imageUtils.js';
 
 export function MessagesPage({ onNavigate, onOpenSafety }) {
+  const { user } = useAuth();
   const { 
     conversations, 
     activeConversationId, 
@@ -33,6 +34,33 @@ export function MessagesPage({ onNavigate, onOpenSafety }) {
     updateHandshakeState, 
     markConversationAsRead 
   } = useChat();
+
+  if (!user) {
+    return (
+      <div className="w-full max-w-xl mx-auto py-16 px-4 text-center space-y-5">
+        <div className="w-16 h-16 rounded-3xl bg-brand-50 border border-brand-200 text-brand-600 flex items-center justify-center mx-auto text-2xl shadow-soft">
+          <Lock className="w-8 h-8 text-brand-600" />
+        </div>
+        <div className="space-y-1.5">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-dark-text tracking-tight">
+            Sign In to Access Messages
+          </h2>
+          <p className="text-xs sm:text-sm text-dark-muted max-w-md mx-auto leading-relaxed">
+            Direct partner chat, real-time messaging, and the privacy reveal handshake are reserved for verified community members.
+          </p>
+        </div>
+        <div className="flex justify-center gap-3 pt-2">
+          <Button
+            variant="primary"
+            onClick={() => onNavigate && onNavigate('/login')}
+            className="font-bold text-xs shadow-xs"
+          >
+            Sign In to Start Chatting
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');

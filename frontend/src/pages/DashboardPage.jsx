@@ -55,6 +55,11 @@ export function DashboardPage({ onOpenCreate, onJoinActivity, onOpenLocationPick
 
   // Handle Joining an activity
   const handleJoin = async (activity) => {
+    if (!user) {
+      toast.warning('Please sign in to join activities and connect with hosts!');
+      if (onJoinActivity) onJoinActivity(activity);
+      return;
+    }
     await joinActivity(activity.id);
     toast.success(`You joined "${activity.title}"! Partner chat is ready.`);
     if (onJoinActivity) {
@@ -350,7 +355,7 @@ export function DashboardPage({ onOpenCreate, onJoinActivity, onOpenLocationPick
 
       </section>
 
-      {/* People Near You Section (Horizontal Carousel) */}
+      {/* People Near You Section */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -358,51 +363,83 @@ export function DashboardPage({ onOpenCreate, onJoinActivity, onOpenLocationPick
             <h3 className="text-base font-bold text-dark-text">People Near You</h3>
             <span className="text-xs text-dark-faint hidden sm:inline">• Shared common hobbies</span>
           </div>
-          <button
-            onClick={() => onComingSoon('Full Community Directory')}
-            className="text-xs font-bold text-brand-600 hover:text-brand-700"
-          >
-            See All
-          </button>
+          {user && (
+            <button
+              onClick={() => onComingSoon('Full Community Directory')}
+              className="text-xs font-bold text-brand-600 hover:text-brand-700 cursor-pointer"
+            >
+              See All
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
-          {people.map((p) => {
-            const avatar = getSafeAvatar(p.name, p.avatar);
+        {user ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+            {people.map((p) => {
+              const avatar = getSafeAvatar(p.name, p.avatar);
 
-            return (
-              <div
-                key={p.id}
-                className="bg-white p-3.5 rounded-2xl border border-border/80 shadow-soft hover:shadow-soft-hover transition-all text-center space-y-2 group"
-              >
-                <div className="relative inline-block mx-auto">
-                  <img
-                    src={avatar}
-                    alt={p.name}
-                    onError={(e) => handleAvatarError(e, p.name)}
-                    className="w-14 h-14 rounded-full object-cover mx-auto ring-2 ring-brand-100 bg-slate-100 group-hover:scale-105 transition-transform"
-                  />
-                  <span className="absolute bottom-0 right-1 w-3 h-3 rounded-full bg-brand-500 ring-2 ring-white" />
-                </div>
-
-                <div>
-                  <h4 className="text-xs font-bold text-dark-text truncate">{p.name}</h4>
-                  <p className="text-[11px] text-brand-600 font-semibold">{p.distanceKm} km away</p>
-                  <p className="text-[10px] text-dark-faint mt-0.5">{p.commonInterests} shared interests</p>
-                </div>
-
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="w-full text-[11px] h-7 font-bold"
-                  onClick={() => onJoinActivity({ title: `Chat with ${p.name}`, creator: p })}
+              return (
+                <div
+                  key={p.id}
+                  className="bg-white p-3.5 rounded-2xl border border-border/80 shadow-soft hover:shadow-soft-hover transition-all text-center space-y-2 group"
                 >
-                  Chat
-                </Button>
+                  <div className="relative inline-block mx-auto">
+                    <img
+                      src={avatar}
+                      alt={p.name}
+                      onError={(e) => handleAvatarError(e, p.name)}
+                      className="w-14 h-14 rounded-full object-cover mx-auto ring-2 ring-brand-100 bg-slate-100 group-hover:scale-105 transition-transform"
+                    />
+                    <span className="absolute bottom-0 right-1 w-3 h-3 rounded-full bg-brand-500 ring-2 ring-white" />
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold text-dark-text truncate">{p.name}</h4>
+                    <p className="text-[11px] text-brand-600 font-semibold">{p.distanceKm} km away</p>
+                    <p className="text-[10px] text-dark-faint mt-0.5">{p.commonInterests} shared interests</p>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="w-full text-[11px] h-7 font-bold"
+                    onClick={() => onJoinActivity({ title: `Chat with ${p.name}`, creator: p })}
+                  >
+                    Chat
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-5 sm:p-6 bg-white rounded-2xl border border-border/80 shadow-soft flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-left">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-brand-50 border border-brand-200 text-brand-600 flex items-center justify-center shrink-0">
+                <Users className="w-5 h-5" />
               </div>
-            );
-          })}
-        </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs sm:text-sm font-bold text-dark-text">Verified Community Members Nearby</h4>
+                  <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-full border border-slate-200">
+                    Sign In Required
+                  </span>
+                </div>
+                <p className="text-xs text-dark-muted mt-0.5">
+                  Sign in to discover people near you, explore shared hobbies, compare compatibility, and start chats.
+                </p>
+              </div>
+            </div>
+
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => onJoinActivity({ title: 'Community Login' })}
+              className="font-bold text-xs shrink-0 shadow-xs"
+            >
+              Sign In to View People
+            </Button>
+          </div>
+        )}
       </section>
 
       {/* Discover Activities Main Feed (Grid or Map) */}

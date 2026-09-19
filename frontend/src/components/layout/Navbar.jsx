@@ -8,12 +8,14 @@ import {
   Shield, 
   Settings, 
   LogOut,
-  ChevronDown
+  ChevronDown,
+  Camera
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useGeo } from '../../context/GeoContext.jsx';
+import { useToast } from '../../context/ToastContext.jsx';
 import { Button } from '../ui/Button.jsx';
-import { getSafeAvatar } from '../../utils/imageUtils.js';
+import { getSafeAvatar, handleAvatarError } from '../../utils/imageUtils.js';
 import { NotificationDropdown } from './NotificationDropdown.jsx';
 
 export function Navbar({ 
@@ -29,6 +31,7 @@ export function Navbar({
 }) {
   const { user, logout } = useAuth();
   const { locationName } = useGeo();
+  const toast = useToast();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const dropdownTimeoutRef = useRef(null);
 
@@ -54,6 +57,15 @@ export function Navbar({
   const handleSelectTab = (tabId) => {
     setActiveTab(tabId);
     setProfileDropdownOpen(false);
+  };
+
+  const handleNavClick = (tabId) => {
+    if (!user && (tabId === 'my-activities' || tabId === 'matches')) {
+      toast.warning(`Please sign in to view ${tabId === 'matches' ? 'matched peers' : 'your activities'}!`);
+      if (onOpenAuth) onOpenAuth();
+      return;
+    }
+    handleSelectTab(tabId);
   };
 
   return (
@@ -104,7 +116,7 @@ export function Navbar({
             Explore
           </button>
           <button
-            onClick={() => handleSelectTab('my-activities')}
+            onClick={() => handleNavClick('my-activities')}
             className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
               activeTab === 'my-activities'
                 ? 'bg-white text-dark-text shadow-xs font-bold'
@@ -114,7 +126,7 @@ export function Navbar({
             My Activities
           </button>
           <button
-            onClick={() => handleSelectTab('matches')}
+            onClick={() => handleNavClick('matches')}
             className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
               activeTab === 'matches'
                 ? 'bg-white text-dark-text shadow-xs font-bold'
@@ -174,6 +186,7 @@ export function Navbar({
                 <img
                   src={getSafeAvatar(user.name, user.avatar)}
                   alt={user.name}
+                  onError={(e) => handleAvatarError(e, user.name)}
                   className="w-7 h-7 rounded-full object-cover ring-1 ring-brand-500/50 bg-slate-100"
                 />
                 <span className="text-xs font-semibold text-dark-text hidden sm:inline max-w-[100px] truncate">
@@ -184,12 +197,17 @@ export function Navbar({
             ) : (
               <button
                 onClick={() => setProfileDropdownOpen((prev) => !prev)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border/80 hover:bg-slate-50 text-dark-text transition-all font-semibold text-xs"
+                className="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full border border-border/80 hover:bg-slate-50 bg-white transition-all shadow-2xs focus:outline-none"
                 aria-expanded={profileDropdownOpen}
-                title="Account Menu"
+                title="Guest Account Menu"
               >
-                <User className="w-3.5 h-3.5 text-dark-muted" />
-                <span className="hidden sm:inline">Account</span>
+                <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center text-slate-500 font-bold text-xs shrink-0">
+                  <User className="w-4 h-4 text-slate-500" />
+                </div>
+                <span className="text-xs font-bold text-dark-text">Guest</span>
+                <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-1.5 py-0.5 rounded-full border border-slate-200 hidden sm:inline">
+                  Sign In
+                </span>
                 <ChevronDown className={`w-3.5 h-3.5 text-dark-muted transition-transform duration-200 ${profileDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
             )}
@@ -204,13 +222,26 @@ export function Navbar({
                 <div className="bg-white rounded-2xl shadow-xl border border-border/90 p-1.5 space-y-1 text-left">
                   {user ? (
                     <>
-                      {/* User Info Header */}
-                      <div className="px-3 py-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-2.5">
-                        <img
-                          src={getSafeAvatar(user.name, user.avatar)}
-                          alt={user.name}
-                          className="w-8 h-8 rounded-full object-cover ring-2 ring-brand-500/30 shrink-0"
-                        />
+                      {/* User Info Header with quick profile click */}
+                      <div 
+                        onClick={() => {
+                          setProfileDropdownOpen(false);
+                          handleSelectTab('profile');
+                        }}
+                        className="px-3 py-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-100 flex items-center gap-2.5 cursor-pointer transition-colors group"
+                        title="View profile & change photo"
+                      >
+                        <div className="relative">
+                          <img
+                            src={getSafeAvatar(user.name, user.avatar)}
+                            alt={user.name}
+                            onError={(e) => handleAvatarError(e, user.name)}
+                            className="w-8 h-8 rounded-full object-cover ring-2 ring-brand-500/30 shrink-0"
+                          />
+                          <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-brand-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs">
+                            <Camera className="w-2 h-2" />
+                          </span>
+                        </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-bold text-dark-text truncate">{user.name}</p>
                           <p className="text-[11px] text-dark-muted truncate">@{user.username || 'user'}</p>
@@ -265,11 +296,13 @@ export function Navbar({
 
                       {/* Logout Option */}
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           setProfileDropdownOpen(false);
-                          logout();
+                          await logout();
+                          handleSelectTab('home');
+                          toast.info('You have logged out. Browsing in Guest mode.');
                         }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                       >
                         <LogOut className="w-4 h-4 text-red-500" />
                         <span>Log Out</span>
@@ -278,28 +311,58 @@ export function Navbar({
                   ) : (
                     <>
                       {/* Guest Header */}
-                      <div className="px-3 py-2 bg-slate-50 rounded-xl">
-                        <p className="text-xs font-bold text-dark-text">Guest User</p>
-                        <p className="text-[11px] text-dark-muted">Sign in to host & join activities</p>
+                      <div 
+                        onClick={() => {
+                          setProfileDropdownOpen(false);
+                          handleSelectTab('profile');
+                        }}
+                        className="px-3 py-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200/60 flex items-center gap-2.5 cursor-pointer transition-colors"
+                        title="View Guest Profile"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 shrink-0">
+                          <User className="w-4 h-4 text-slate-600" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-dark-text">Guest User</p>
+                          <p className="text-[11px] text-brand-600 font-semibold">Click to view guest profile</p>
+                        </div>
                       </div>
 
                       {/* Login CTA */}
-                      <button
-                        onClick={() => {
-                          setProfileDropdownOpen(false);
-                          onOpenAuth();
-                        }}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-brand-500 hover:bg-brand-600 text-white transition-colors"
-                      >
-                        <LogIn className="w-4 h-4" />
-                        <span>Sign In / Register</span>
-                      </button>
+                      <div className="pt-1">
+                        <button
+                          onClick={() => {
+                            setProfileDropdownOpen(false);
+                            onOpenAuth();
+                          }}
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-brand-500 hover:bg-brand-600 text-white transition-colors shadow-xs cursor-pointer"
+                        >
+                          <LogIn className="w-4 h-4" />
+                          <span>Sign In / Register</span>
+                        </button>
+                      </div>
 
                       <div className="h-px bg-border/60 my-1"></div>
 
                       <button
+                        onClick={() => handleSelectTab('profile')}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                          activeTab === 'profile'
+                            ? 'bg-brand-50 text-brand-700 font-bold'
+                            : 'text-dark-text hover:bg-slate-50'
+                        }`}
+                      >
+                        <User className="w-4 h-4 text-slate-600" />
+                        <span>Guest Profile</span>
+                      </button>
+
+                      <button
                         onClick={() => handleSelectTab('safety')}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-dark-text hover:bg-slate-50 transition-colors"
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                          activeTab === 'safety'
+                            ? 'bg-brand-50 text-brand-700 font-bold'
+                            : 'text-dark-text hover:bg-slate-50'
+                        }`}
                       >
                         <Shield className="w-4 h-4 text-brand-600" />
                         <span>Safety & Trust</span>
@@ -308,17 +371,18 @@ export function Navbar({
                       <button
                         onClick={() => {
                           setProfileDropdownOpen(false);
-                          onComingSoon('Settings');
+                          handleSelectTab('settings');
                         }}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-dark-text hover:bg-slate-50 transition-colors"
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                          activeTab === 'settings'
+                            ? 'bg-brand-50 text-brand-700 font-bold'
+                            : 'text-dark-text hover:bg-slate-50'
+                        }`}
                       >
                         <div className="flex items-center gap-2.5">
                           <Settings className="w-4 h-4 text-slate-500" />
-                          <span>Settings</span>
+                          <span>Settings & Privacy</span>
                         </div>
-                        <span className="text-[9px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded">
-                          Soon
-                        </span>
                       </button>
                     </>
                   )}

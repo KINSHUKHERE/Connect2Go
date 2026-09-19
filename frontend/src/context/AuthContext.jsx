@@ -4,23 +4,122 @@ import { supabase, isSupabaseConfigured } from '../services/supabase.js';
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState({
-    id: 'usr-demo-1',
-    name: 'Kinshuk Khandelwal',
-    username: 'kinshuk',
-    email: 'kinshuk@example.com',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
-    bio: 'Tech enthusiast. Love sports, travel, and meeting active people nearby!',
-    location: 'Jaipur, Rajasthan',
-    interests: ['Badminton', 'Running', 'Gaming', 'Music', 'Travel', 'Photography'],
-    stats: { activities: 12, matches: 8, connections: 24 },
-    isAdmin: false,
+  const [user, setUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem('connect2go_user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.id) return parsed;
+      }
+    } catch (e) {}
+    return null;
   });
 
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(() => {
+    try {
+      const stored = localStorage.getItem('connect2go_user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return Boolean(parsed?.isAdmin);
+      }
+    } catch (e) {}
+    return false;
+  });
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
+
+  // Update user avatar across the entire application and persist in localStorage
+  const updateUserAvatar = async (newAvatarUrl, publicId = null) => {
+    const oldPublicId = user?.avatarPublicId;
+    const oldAvatar = user?.avatar;
+
+    // Clean up old Cloudinary photo if replacing with a different image
+    if (oldPublicId && oldPublicId !== publicId) {
+      try {
+        await fetch('http://localhost:5000/api/upload', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ public_id: oldPublicId, url: oldAvatar })
+        });
+      } catch (e) {}
+    } else if (oldAvatar && oldAvatar.includes('cloudinary.com') && oldAvatar !== newAvatarUrl) {
+      try {
+        await fetch('http://localhost:5000/api/upload', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: oldAvatar })
+        });
+      } catch (e) {}
+    }
+
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = { 
+        ...prev, 
+        avatar: newAvatarUrl,
+        avatarPublicId: publicId !== undefined ? publicId : prev.avatarPublicId
+      };
+      try {
+        localStorage.setItem('connect2go_user', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to save avatar to localStorage', e);
+      }
+      return updated;
+    });
+  };
+
+  // Permanently delete user avatar from Cloudinary and reset to default
+  const removeUserAvatar = async () => {
+    const currentAvatar = user?.avatar;
+    const currentPublicId = user?.avatarPublicId;
+
+    // Trigger backend deletion if hosted on Cloudinary
+    if (currentPublicId || (currentAvatar && currentAvatar.includes('cloudinary.com'))) {
+      try {
+        await fetch('http://localhost:5000/api/upload', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            public_id: currentPublicId,
+            url: currentAvatar
+          })
+        });
+      } catch (err) {
+        console.warn('[Avatar Delete] Backend Cloudinary delete request failed:', err);
+      }
+    }
+
+    // Reset user avatar to null or default generated avatar
+    const defaultDicebear = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name || 'User')}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        avatar: defaultDicebear,
+        avatarPublicId: null
+      };
+      try {
+        localStorage.setItem('connect2go_user', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    return { success: true };
+  };
+
+  // Generic profile updater
+  const updateUserProfile = (fields) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...fields };
+      try {
+        localStorage.setItem('connect2go_user', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
 
   // Sync Supabase Auth session on mount
   useEffect(() => {
@@ -33,9 +132,15 @@ export function AuthProvider({ children }) {
       }
     });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         mapSupabaseUser(session.user);
+      } else if (event === 'SIGNED_OUT' || !session) {
+        setUser(null);
+        setIsAdmin(false);
+        try {
+          localStorage.removeItem('connect2go_user');
+        } catch (e) {}
       }
     });
 
@@ -46,45 +151,91 @@ export function AuthProvider({ children }) {
 
   const mapSupabaseUser = (sbUser) => {
     const meta = sbUser.user_metadata || {};
+    const email = sbUser.email || '';
+    const isMasterAdmin = email.toLowerCase() === 'herekinshuk@gmail.com' || email.toLowerCase().includes('admin');
     const newUser = {
       id: sbUser.id,
-      name: meta.name || meta.full_name || sbUser.email.split('@')[0],
-      username: meta.username || sbUser.email.split('@')[0],
-      email: sbUser.email,
-      avatar: meta.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
-      bio: meta.bio || 'Ready to explore activities nearby!',
+      name: isMasterAdmin ? 'Kinshuk Khandelwal' : (meta.name || meta.full_name || email.split('@')[0]),
+      username: meta.username || (isMasterAdmin ? 'kinshuk_admin' : email.split('@')[0]),
+      email: email,
+      avatar: meta.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+      bio: meta.bio || (isMasterAdmin ? 'Platform Administrator & Creator of Connect2Go.' : 'Ready to explore activities nearby!'),
       location: meta.location || 'Jaipur, Rajasthan',
       interests: meta.interests || ['Badminton', 'Study', 'Fitness'],
-      stats: { activities: 1, matches: 0, connections: 1 },
-      isAdmin: sbUser.email.includes('admin'),
+      stats: isMasterAdmin ? { activities: 24, matches: 15, connections: 52 } : { activities: 1, matches: 0, connections: 1 },
+      isAdmin: isMasterAdmin,
     };
     setUser(newUser);
     setIsAdmin(newUser.isAdmin);
+    try {
+      localStorage.setItem('connect2go_user', JSON.stringify(newUser));
+    } catch (e) {}
   };
 
-  // Live Supabase Email/Password Signup
+  // Live Supabase Email/Password Signup with Strict Password Policy
   const signUpWithEmail = async (email, password, name, username) => {
     setAuthLoading(true);
     setAuthError(null);
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-            username: username || email.split('@')[0],
-            avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80'
-          }
-        }
-      });
 
-      if (error) throw error;
-      if (data?.user) {
-        mapSupabaseUser(data.user);
+    // Password Validation: 8-16 chars, 1 capital, 1 small, 1 number
+    const hasCapital = /[A-Z]/.test(password);
+    const hasSmall = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasValidLength = password.length >= 8 && password.length <= 16;
+
+    if (!hasValidLength || !hasCapital || !hasSmall || !hasNumber) {
+      const pending = [];
+      if (password.length < 8) pending.push('minimum 8 characters');
+      else if (password.length > 16) pending.push('maximum 16 characters');
+      if (!hasCapital) pending.push('at least 1 uppercase letter');
+      if (!hasSmall) pending.push('at least 1 lowercase letter');
+      if (!hasNumber) pending.push('at least 1 number');
+
+      const errorMsg = `Password requirement not filled: ${pending.join(', ')}.`;
+      setAuthError(errorMsg);
+      setAuthLoading(false);
+      return { success: false, error: errorMsg };
+    }
+
+    try {
+      if (isSupabaseConfigured && supabase.auth) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              name,
+              username: username || email.split('@')[0],
+              avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80'
+            }
+          }
+        });
+
+        if (error) throw error;
+        if (data?.user) {
+          mapSupabaseUser(data.user);
+          setAuthModalOpen(false);
+        }
+        return { success: true };
+      } else {
+        // Fallback local registration
+        const newUser = {
+          id: 'usr-' + Date.now(),
+          name: name || email.split('@')[0],
+          username: username || email.split('@')[0],
+          email,
+          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
+          bio: 'Ready to explore activities nearby!',
+          location: 'Jaipur, Rajasthan',
+          interests: ['Badminton', 'Study', 'Fitness'],
+          stats: { activities: 0, matches: 0, connections: 0 },
+          isAdmin: false,
+        };
+        setUser(newUser);
+        setIsAdmin(false);
         setAuthModalOpen(false);
+        return { success: true, user: newUser };
       }
-      return { success: true };
     } catch (err) {
       setAuthError(err.message);
       return { success: false, error: err.message };
@@ -93,22 +244,73 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Live Supabase Email/Password Signin
+  // Live Email/Password Signin with Master Administrator Support
   const signInWithEmail = async (email, password) => {
     setAuthLoading(true);
     setAuthError(null);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
 
-      if (error) throw error;
-      if (data?.user) {
-        mapSupabaseUser(data.user);
+    const normEmail = (email || '').trim().toLowerCase();
+
+    // Master Administrator Login: herekinshuk@gmail.com / 123456
+    if (normEmail === 'herekinshuk@gmail.com') {
+      if (password === '123456') {
+        const adminUser = {
+          id: 'admin-kinshuk-1',
+          name: 'Kinshuk Khandelwal',
+          username: 'kinshuk_admin',
+          email: 'herekinshuk@gmail.com',
+          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+          isAdmin: true,
+          stats: { activities: 24, matches: 15, connections: 52 },
+          bio: 'Platform Administrator & Creator of Connect2Go.',
+          interests: ['Safety', 'Campus Community', 'Operations', 'Tech'],
+          location: 'Jaipur, HQ'
+        };
+        setUser(adminUser);
+        setIsAdmin(true);
         setAuthModalOpen(false);
+        setAuthLoading(false);
+        return { success: true, user: adminUser, isAdmin: true };
+      } else {
+        setAuthLoading(false);
+        const err = 'Incorrect password for Administrator account.';
+        setAuthError(err);
+        return { success: false, error: err };
       }
-      return { success: true };
+    }
+
+    try {
+      if (isSupabaseConfigured && supabase.auth) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: normEmail,
+          password
+        });
+
+        if (error) throw error;
+        if (data?.user) {
+          mapSupabaseUser(data.user);
+          setAuthModalOpen(false);
+        }
+        return { success: true };
+      } else {
+        // Fallback local signin for test accounts
+        const loggedUser = {
+          id: 'usr-' + Date.now(),
+          name: normEmail.split('@')[0],
+          username: normEmail.split('@')[0],
+          email: normEmail,
+          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
+          bio: 'Ready to explore activities nearby!',
+          location: 'Jaipur, Rajasthan',
+          interests: ['Badminton', 'Study', 'Fitness'],
+          stats: { activities: 1, matches: 0, connections: 1 },
+          isAdmin: false,
+        };
+        setUser(loggedUser);
+        setIsAdmin(false);
+        setAuthModalOpen(false);
+        return { success: true, user: loggedUser };
+      }
     } catch (err) {
       setAuthError(err.message);
       return { success: false, error: err.message };
@@ -119,7 +321,7 @@ export function AuthProvider({ children }) {
 
   // Instant Demo Switchers for rapid testing
   const loginAsUser = () => {
-    setUser({
+    const demoUser = {
       id: 'usr-demo-1',
       name: 'Kinshuk Khandelwal',
       username: 'kinshuk',
@@ -130,46 +332,64 @@ export function AuthProvider({ children }) {
       interests: ['Badminton', 'Running', 'Gaming', 'Music', 'Travel', 'Photography'],
       stats: { activities: 12, matches: 8, connections: 24 },
       isAdmin: false,
-    });
+    };
+    setUser(demoUser);
     setIsAdmin(false);
     setAuthModalOpen(false);
+    try {
+      localStorage.setItem('connect2go_user', JSON.stringify(demoUser));
+    } catch (e) {}
+    return demoUser;
   };
 
   const loginAsAdmin = () => {
-    setUser({
-      id: 'admin-demo-1',
-      name: 'Platform Administrator',
-      username: 'admin',
-      email: 'admin@connect2go.com',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80',
+    const adminUser = {
+      id: 'admin-kinshuk-1',
+      name: 'Kinshuk Khandelwal',
+      username: 'kinshuk_admin',
+      email: 'herekinshuk@gmail.com',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
       isAdmin: true,
       stats: { activities: 24, matches: 15, connections: 52 },
-      bio: 'System Administrator managing safe community spaces.',
-      interests: ['Safety', 'Campus Community', 'Operations'],
+      bio: 'Platform Administrator & Creator of Connect2Go.',
+      interests: ['Safety', 'Campus Community', 'Operations', 'Tech'],
       location: 'Jaipur, HQ'
-    });
+    };
+    setUser(adminUser);
     setIsAdmin(true);
     setAuthModalOpen(false);
+    try {
+      localStorage.setItem('connect2go_user', JSON.stringify(adminUser));
+    } catch (e) {}
+    return adminUser;
   };
 
   const logout = async () => {
+    try {
+      localStorage.removeItem('connect2go_user');
+    } catch (e) {}
+    setUser(null);
+    setIsAdmin(false);
     if (isSupabaseConfigured && supabase.auth) {
       await supabase.auth.signOut().catch(() => {});
     }
-    setUser(null);
-    setIsAdmin(false);
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        isAuthenticated: Boolean(user),
+        isGuest: !user,
         isAdmin,
         setIsAdmin,
         loginAsUser,
         loginAsAdmin,
         signUpWithEmail,
         signInWithEmail,
+        updateUserAvatar,
+        removeUserAvatar,
+        updateUserProfile,
         logout,
         authModalOpen,
         setAuthModalOpen,

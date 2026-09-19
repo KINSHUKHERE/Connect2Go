@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { GeoProvider } from './context/GeoContext.jsx';
-import { ToastProvider } from './context/ToastContext.jsx';
+import { ToastProvider, useToast } from './context/ToastContext.jsx';
 import { Navbar } from './components/layout/Navbar.jsx';
 import { BottomNavigation } from './components/layout/BottomNavigation.jsx';
 import { LandingPage } from './pages/LandingPage.jsx';
@@ -9,10 +9,12 @@ import { DashboardPage } from './pages/DashboardPage.jsx';
 import { MyActivitiesPage } from './pages/MyActivitiesPage.jsx';
 import { MatchesPage } from './pages/MatchesPage.jsx';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage.jsx';
+import { AdminSecurityGate } from './pages/admin/AdminSecurityGate.jsx';
 import { TrustLegalPage } from './pages/TrustLegalPage.jsx';
 import { ProfilePage } from './pages/ProfilePage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { MessagesPage } from './pages/MessagesPage.jsx';
+import { AuthPage } from './pages/AuthPage.jsx';
 import { ChatProvider, useChat } from './context/ChatContext.jsx';
 import { CreateRequestModal } from './components/requests/CreateRequestModal.jsx';
 import { ChatDrawer } from './components/chat/ChatDrawer.jsx';
@@ -23,13 +25,14 @@ import { Badge } from './components/ui/Badge.jsx';
 import { Footer } from './components/layout/Footer.jsx';
 import { LegalModal } from './components/safety/LegalModal.jsx';
 import { LocationPickerModal } from './components/map/LocationPickerModal.jsx';
-import { SettingsModal } from './components/settings/SettingsModal.jsx';
 import { Sparkles, Shield, MapPin, Check } from 'lucide-react';
 import { getSafeAvatar, handleAvatarError } from './utils/imageUtils.js';
 
 function MainApp() {
+  const toast = useToast();
   const { 
     user, 
+    logout,
     loginAsUser, 
     loginAsAdmin, 
     authModalOpen, 
@@ -43,7 +46,19 @@ function MainApp() {
   
   // Track URL path to separate User Panel (/) from Admin Panel (/admin)
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
-  const [activeTab, setActiveTab] = useState('home'); // 'home', 'explore', 'my-activities', 'matches', 'profile', 'safety'
+
+  // Synchronously compute initial tab from URL pathname to eliminate millisecond flash on refresh
+  const getInitialTab = () => {
+    if (typeof window === 'undefined') return 'home';
+    const cleanPath = window.location.pathname.replace(/^\//, '');
+    const validTabs = ['explore', 'my-activities', 'matches', 'messages', 'profile', 'safety', 'settings', 'terms', 'privacy', 'login', 'signup'];
+    if (validTabs.includes(cleanPath)) {
+      return cleanPath;
+    }
+    return 'home';
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatPeer, setChatPeer] = useState('Rohan');
@@ -51,7 +66,6 @@ function MainApp() {
   const [reportModal, setReportModal] = useState({ isOpen: false, targetUser: '' });
   const [legalModal, setLegalModal] = useState({ isOpen: false, tab: 'terms' });
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Auth Modal State
   const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup'
@@ -80,7 +94,7 @@ function MainApp() {
       const path = window.location.pathname;
       setCurrentPath(path);
       const cleanPath = path.replace(/^\//, '');
-      const validTabs = ['explore', 'my-activities', 'matches', 'messages', 'profile', 'safety', 'settings', 'terms', 'privacy'];
+      const validTabs = ['explore', 'my-activities', 'matches', 'messages', 'profile', 'safety', 'settings', 'terms', 'privacy', 'login', 'signup'];
       if (validTabs.includes(cleanPath)) {
         setActiveTab(cleanPath);
       } else if (path === '/' || cleanPath === '') {
@@ -110,6 +124,8 @@ function MainApp() {
       'settings': 'Settings & Privacy Hub — Connect2Go',
       'terms': 'Terms & Conditions — Connect2Go',
       'privacy': 'Privacy Policy — Connect2Go',
+      'login': 'Sign In — Connect2Go',
+      'signup': 'Create Account — Connect2Go',
     };
 
     document.title = titleMap[activeTab] || 'Connect2Go — Live Activity Partner Platform';
@@ -127,7 +143,21 @@ function MainApp() {
     handleSelectTab(tab);
   };
 
+  const handleOpenCreate = () => {
+    if (!user) {
+      toast.warning('Please sign in to host an activity!');
+      handleSelectTab('login');
+      return;
+    }
+    setIsCreateModalOpen(true);
+  };
+
   const handleJoinActivity = (activity) => {
+    if (!user) {
+      toast.warning('Please sign in to join activities and chat with partners!');
+      handleSelectTab('login');
+      return;
+    }
     const peerData = activity?.creator || (activity?.name ? activity : {
       name: activity?.creator_name || 'Partner',
       avatar: activity?.creator_avatar,
@@ -139,10 +169,51 @@ function MainApp() {
     handleSelectTab('messages');
   };
 
+  const isAuthTab = activeTab === 'login' || activeTab === 'signup';
+
   // ==========================================
-  // RENDER SEPARATE ADMIN PANEL AT /admin
+  // RENDER SEPARATE ADMIN PANEL AT /admin (PROTECTED)
   // ==========================================
   if (currentPath.startsWith('/admin')) {
+    const isUserAdmin = Boolean(
+      user && (
+        user.isAdmin === true ||
+        user.role === 'admin' ||
+        (user.email && user.email.toLowerCase() === 'herekinshuk@gmail.com')
+      )
+    );
+
+    // 1. Unauthenticated Guest -> Block with Security Gate
+    if (!user) {
+      return (
+        <AdminSecurityGate
+          reason="unauthenticated"
+          onSignInAdmin={() => {
+            handleSelectTab('login');
+            toast.info('Please sign in with administrator credentials (herekinshuk@gmail.com).');
+          }}
+          onBackToHome={() => navigateTo('/')}
+        />
+      );
+    }
+
+    // 2. Authenticated Normal Member (Not Admin) -> 403 Access Denied Gate
+    if (!isUserAdmin) {
+      return (
+        <AdminSecurityGate
+          reason="unauthorized"
+          user={user}
+          onSignOut={async () => {
+            await logout();
+            handleSelectTab('login');
+            toast.info('Signed out. Please sign in with administrator credentials.');
+          }}
+          onBackToHome={() => navigateTo('/')}
+        />
+      );
+    }
+
+    // 3. Verified Administrator -> Render Admin Operations Hub
     return (
       <AdminDashboardPage
         onBackToUserPanel={() => navigateTo('/')}
@@ -157,21 +228,30 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-canvas text-dark-text flex flex-col selection:bg-brand-100 selection:text-brand-900">
       
-      {/* Top Navigation */}
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={handleSelectTab}
-        onNavigate={navigateTo}
-        onOpenAuth={() => setAuthModalOpen(true)}
-        onOpenCreate={() => setIsCreateModalOpen(true)}
-        onOpenChat={() => handleSelectTab('messages')}
-        onOpenLocationPicker={() => setIsLocationModalOpen(true)}
-        onOpenSettings={() => handleSelectTab('settings')}
-        onComingSoon={handleOpenComingSoon}
-      />
+      {/* Top Navigation - Hidden completely on Login & Sign Up */}
+      {!isAuthTab && (
+        <Navbar
+          activeTab={activeTab}
+          setActiveTab={handleSelectTab}
+          onNavigate={navigateTo}
+          onOpenAuth={() => handleSelectTab('login')}
+          onOpenCreate={handleOpenCreate}
+          onOpenChat={() => {
+            if (!user) {
+              toast.warning('Please sign in to access messages!');
+              handleSelectTab('login');
+              return;
+            }
+            handleSelectTab('messages');
+          }}
+          onOpenLocationPicker={() => setIsLocationModalOpen(true)}
+          onOpenSettings={() => handleSelectTab('settings')}
+          onComingSoon={handleOpenComingSoon}
+        />
+      )}
 
       {/* Main Full-Width Content Container */}
-      <main className="flex-1 w-full px-4 sm:px-6 lg:px-10 py-6">
+      <main className={`flex-1 w-full ${isAuthTab ? 'p-0' : 'px-4 sm:px-6 lg:px-10 py-6'}`}>
           {activeTab === 'home' && (
             <LandingPage
               onGetStarted={() => handleSelectTab('explore')}
@@ -183,7 +263,7 @@ function MainApp() {
 
           {activeTab === 'explore' && (
             <DashboardPage
-              onOpenCreate={() => setIsCreateModalOpen(true)}
+              onOpenCreate={handleOpenCreate}
               onJoinActivity={handleJoinActivity}
               onOpenLocationPicker={() => setIsLocationModalOpen(true)}
               onComingSoon={handleOpenComingSoon}
@@ -192,7 +272,7 @@ function MainApp() {
 
           {activeTab === 'my-activities' && (
             <MyActivitiesPage
-              onOpenCreate={() => setIsCreateModalOpen(true)}
+              onOpenCreate={handleOpenCreate}
               onOpenChat={handleJoinActivity}
               onComingSoon={handleOpenComingSoon}
             />
@@ -237,7 +317,21 @@ function MainApp() {
           {activeTab === 'settings' && (
             <SettingsPage
               onNavigate={navigateTo}
+              onSelectTab={handleSelectTab}
               onOpenSafety={() => handleSelectTab('safety')}
+              onOpenAuth={() => handleSelectTab('login')}
+            />
+          )}
+
+          {/* Dedicated Full Page: Authentication (Sign In & Sign Up) */}
+          {(activeTab === 'login' || activeTab === 'signup') && (
+            <AuthPage
+              mode={activeTab === 'signup' ? 'signup' : 'signin'}
+              onNavigate={(dest) => {
+                if (dest === 'home') handleSelectTab('home');
+                else if (dest === 'admin') navigateTo('/admin');
+                else handleSelectTab(dest);
+              }}
             />
           )}
 
@@ -248,20 +342,29 @@ function MainApp() {
         <Footer
           onNavigate={navigateTo}
           onSelectTab={handleSelectTab}
-          onOpenCreate={() => setIsCreateModalOpen(true)}
+          onOpenCreate={handleOpenCreate}
           onOpenTerms={() => handleOpenLegal('terms')}
           onOpenPrivacy={() => handleOpenLegal('privacy')}
           onComingSoon={handleOpenComingSoon}
         />
       )}
 
-      {/* Mobile Bottom Navigation */}
-      <BottomNavigation
-        currentTab={activeTab}
-        setCurrentTab={handleSelectTab}
-        onOpenCreate={() => setIsCreateModalOpen(true)}
-        onOpenChat={() => handleSelectTab('messages')}
-      />
+      {/* Mobile Bottom Navigation - Hidden on Login & Sign Up */}
+      {!isAuthTab && (
+        <BottomNavigation
+          currentTab={activeTab}
+          setCurrentTab={handleSelectTab}
+          onOpenCreate={handleOpenCreate}
+          onOpenChat={() => {
+            if (!user) {
+              toast.warning('Please sign in to access messages!');
+              handleSelectTab('login');
+              return;
+            }
+            handleSelectTab('messages');
+          }}
+        />
+      )}
 
       {/* Create Activity Modal */}
       <CreateRequestModal
@@ -277,13 +380,6 @@ function MainApp() {
         peer={chatPeer}
         peerName={typeof chatPeer === 'string' ? chatPeer : chatPeer?.name || 'Rohan'}
         onComingSoon={handleOpenComingSoon}
-      />
-
-      {/* Preferences & Privacy Fuzzing Hub Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        user={user}
       />
 
       {/* Safety Report Modal */}
@@ -453,7 +549,7 @@ function MainApp() {
               onClick={loginAsAdmin}
               className="w-full text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
-              Quick Test as Administrator
+              Quick Test as Administrator (Kinshuk Khandelwal)
             </Button>
           </div>
 

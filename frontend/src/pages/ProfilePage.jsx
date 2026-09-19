@@ -15,7 +15,9 @@ import {
   Lock,
   Camera,
   Activity,
-  ArrowLeft
+  ArrowLeft,
+  Trash2,
+  LogIn
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useGeo } from '../context/GeoContext.jsx';
@@ -23,14 +25,16 @@ import { useToast } from '../context/ToastContext.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
 import { getSafeAvatar, handleAvatarError } from '../utils/imageUtils.js';
+import { AvatarUploadModal } from '../components/profile/AvatarUploadModal.jsx';
 
 export function ProfilePage({ onNavigate, onOpenSettings, onOpenSafety, onComingSoon }) {
-  const { user } = useAuth();
+  const { user, updateUserAvatar, removeUserAvatar } = useAuth();
   const { locationName } = useGeo();
   const { addToast } = useToast();
 
   const [isEditingBio, setIsEditingBio] = useState(false);
-  const [bio, setBio] = useState(user?.bio || 'Passionate about sports, weekend morning runs, tech hackathons, and meeting genuine people nearby in Jaipur.');
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [bio, setBio] = useState(user?.bio || '');
   const [interests, setInterests] = useState(user?.interests || ['Badminton', 'Running', 'Coding', 'Music', 'Fitness']);
   const [newTagInput, setNewTagInput] = useState('');
   const [showAddTag, setShowAddTag] = useState(false);
@@ -55,8 +59,144 @@ export function ProfilePage({ onNavigate, onOpenSettings, onOpenSafety, onComing
     setInterests(interests.filter((t) => t !== tag));
   };
 
-  const name = user?.name || 'Kinshuk Khandelwal';
-  const avatar = getSafeAvatar(name, user?.avatar);
+  const handleRemoveAvatarClick = async () => {
+    if (window.confirm('Are you sure you want to remove your avatar? If hosted on Cloudinary, it will be permanently deleted.')) {
+      await removeUserAvatar();
+      addToast('Avatar removed and permanently deleted from Cloudinary.', 'info');
+    }
+  };
+
+  // Dedicated Guest Profile when user is not logged in
+  if (!user) {
+    const guestAvatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=Guest&backgroundColor=e2e8f0,cbd5e1';
+
+    return (
+      <div className="w-full space-y-6 text-left pb-20 max-w-4xl mx-auto">
+        {/* Top Header Bar */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => onNavigate('/')}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-dark-muted hover:text-brand-600 transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Home</span>
+          </button>
+
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onNavigate('/login')}
+              icon={LogIn}
+              className="text-xs font-bold text-brand-600 border-brand-200 hover:bg-brand-50"
+            >
+              Sign In
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => onNavigate('/signup')}
+              icon={Sparkles}
+              className="text-xs font-bold"
+            >
+              Register
+            </Button>
+          </div>
+        </div>
+
+        {/* Guest Profile Hero Card */}
+        <div className="bg-white rounded-3xl border border-border/80 p-6 sm:p-8 shadow-soft relative overflow-hidden text-left">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 relative z-10">
+            <div className="relative">
+              <img
+                src={guestAvatar}
+                alt="Guest User"
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl object-cover ring-4 ring-slate-100 shadow-md bg-slate-50"
+              />
+              <span className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-slate-400 ring-2 ring-white" title="Guest Mode" />
+            </div>
+
+            <div className="space-y-1.5 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-dark-text tracking-tight">
+                  Guest User
+                </h1>
+                <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                  <User className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Guest Mode (Not Signed In)</span>
+                </span>
+              </div>
+              <p className="text-xs text-brand-600 font-semibold">@guest</p>
+              
+              <p className="text-xs text-dark-muted pt-1 max-w-xl leading-relaxed">
+                You are currently exploring Connect2Go as a guest. Sign in or create an account to customize your avatar, select your sports & hobbies, chat with verified partners nearby, and host activities!
+              </p>
+
+              <div className="flex flex-wrap items-center gap-3 pt-3">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => onNavigate('/login')}
+                  icon={LogIn}
+                  className="font-bold text-xs shadow-xs"
+                >
+                  Sign In to Connect2Go
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onNavigate('/signup')}
+                  icon={Sparkles}
+                  className="font-bold text-xs"
+                >
+                  Create Free Account
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Member-Only Features Preview (Gated) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white p-5 rounded-2xl border border-border/80 shadow-soft space-y-2 text-center">
+            <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto text-lg font-bold">
+              🏸
+            </div>
+            <h3 className="text-xs font-bold text-dark-text">Hosted Activities</h3>
+            <p className="text-[11px] text-dark-muted">Sign in to organize meetups, set skill levels, and approve joins.</p>
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400">
+              <Lock className="w-3 h-3" /> Member Feature
+            </span>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-border/80 shadow-soft space-y-2 text-center">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto text-lg font-bold">
+              🤝
+            </div>
+            <h3 className="text-xs font-bold text-dark-text">Live Partner Chat</h3>
+            <p className="text-[11px] text-dark-muted">Chat with activity creators with our dual privacy reveal handshake.</p>
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400">
+              <Lock className="w-3 h-3" /> Member Feature
+            </span>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-border/80 shadow-soft space-y-2 text-center">
+            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto text-lg font-bold">
+              🛡️
+            </div>
+            <h3 className="text-xs font-bold text-dark-text">Safety & Verification</h3>
+            <p className="text-[11px] text-dark-muted">Get your ID verified badge and sign the campus safety pledge.</p>
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400">
+              <Lock className="w-3 h-3" /> Member Feature
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const name = user.name;
+  const avatar = getSafeAvatar(name, user.avatar);
 
   return (
     <div className="w-full space-y-6 text-left pb-20">
@@ -99,22 +239,48 @@ export function ProfilePage({ onNavigate, onOpenSettings, onOpenSafety, onComing
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative z-10">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-            <div className="relative group">
-              <img
-                src={avatar}
-                alt={name}
-                onError={(e) => handleAvatarError(e, name)}
-                className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl object-cover ring-4 ring-brand-100 shadow-md bg-slate-100"
-              />
-              <button 
-                onClick={() => onComingSoon('Photo Upload (Cloudinary)')}
-                className="absolute inset-0 bg-black/40 text-white rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-[10px] font-bold"
-                title="Change Profile Photo"
+            <div className="flex flex-col items-center sm:items-start gap-2">
+              <div 
+                className="relative group cursor-pointer"
+                onClick={() => setIsAvatarModalOpen(true)}
               >
-                <Camera className="w-5 h-5 mb-1" />
-                <span>Change</span>
-              </button>
-              <span className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white" title="Active Status" />
+                <img
+                  src={avatar}
+                  alt={name}
+                  onError={(e) => handleAvatarError(e, name)}
+                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl object-cover ring-4 ring-brand-100 shadow-md bg-slate-100 transition-transform group-hover:scale-[1.02]"
+                />
+                <div 
+                  className="absolute inset-0 bg-black/40 text-white rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-[10px] font-bold"
+                  title="Upload Profile Photo"
+                >
+                  <Camera className="w-5 h-5 mb-1" />
+                  <span>Upload</span>
+                </div>
+                <span className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white" title="Active Status" />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAvatarModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200/80 rounded-xl text-[11px] font-bold shadow-2xs transition-colors cursor-pointer"
+                  title="Upload or change profile avatar"
+                >
+                  <Camera className="w-3.5 h-3.5 text-brand-600" />
+                  <span>Upload Avatar</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleRemoveAvatarClick}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200/80 rounded-xl text-[11px] font-bold shadow-2xs transition-colors cursor-pointer"
+                  title="Remove avatar and permanently delete from Cloudinary"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                  <span>Remove</span>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -436,6 +602,23 @@ export function ProfilePage({ onNavigate, onOpenSettings, onOpenSafety, onComing
         </div>
 
       </div>
+
+      {/* Avatar Upload Modal */}
+      <AvatarUploadModal
+        isOpen={isAvatarModalOpen}
+        onClose={() => setIsAvatarModalOpen(false)}
+        currentAvatar={user?.avatar}
+        currentPublicId={user?.avatarPublicId}
+        userName={name}
+        onSaveAvatar={(newUrl, publicId) => {
+          updateUserAvatar(newUrl, publicId);
+          addToast('Profile avatar updated successfully! Reflected in navbar and profile.', 'success');
+        }}
+        onRemoveAvatar={async () => {
+          await removeUserAvatar();
+          addToast('Avatar removed and permanently deleted from Cloudinary.', 'info');
+        }}
+      />
 
     </div>
   );

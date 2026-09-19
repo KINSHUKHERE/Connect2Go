@@ -23,7 +23,7 @@ export function Sidebar({ currentTab, setCurrentTab, onNavigate, onOpenCreate, o
     { id: 'messages', label: 'Messages', icon: MessageCircle, badge: '2', action: onOpenChat },
     { id: 'notifications', label: 'Notifications', icon: Bell, comingSoon: true },
     { id: 'profile', label: 'Profile', icon: User },
-    { id: 'settings', label: 'Settings', icon: Settings, comingSoon: true },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
@@ -78,34 +78,36 @@ export function Sidebar({ currentTab, setCurrentTab, onNavigate, onOpenCreate, o
         </div>
       </div>
 
-      {/* Admin Panel Footer Card */}
-      <div className="p-3.5 bg-slate-900 rounded-lg text-white space-y-2 border border-slate-800 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-brand-400" />
-            <span className="text-xs font-bold tracking-wide">ADMIN PANEL</span>
+      {/* Admin Panel Footer Card - Only visible to verified Administrators */}
+      {Boolean(user && (user.isAdmin || user.role === 'admin' || user.email?.toLowerCase() === 'herekinshuk@gmail.com')) && (
+        <div className="p-3.5 bg-slate-900 rounded-lg text-white space-y-2 border border-slate-800 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-brand-400" />
+              <span className="text-xs font-bold tracking-wide">ADMIN PANEL</span>
+            </div>
+            <span className="text-[9px] bg-brand-500/20 text-brand-300 px-1.5 py-0.5 rounded font-bold">
+              Separate URL
+            </span>
           </div>
-          <span className="text-[9px] bg-brand-500/20 text-brand-300 px-1.5 py-0.5 rounded font-bold">
-            Separate URL
-          </span>
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            Manage users, moderate requests, and view platform reports.
+          </p>
+          <a
+            href="/admin"
+            onClick={(e) => {
+              if (onNavigate) {
+                e.preventDefault();
+                onNavigate('/admin');
+              }
+            }}
+            className="flex items-center justify-center gap-1.5 w-full py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-md text-xs font-bold transition-all shadow-xs cursor-pointer"
+          >
+            <span>Open /admin</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
         </div>
-        <p className="text-[11px] text-slate-400 leading-relaxed">
-          Manage users, moderate requests, and view platform reports.
-        </p>
-        <a
-          href="/admin"
-          onClick={(e) => {
-            if (onNavigate) {
-              e.preventDefault();
-              onNavigate('/admin');
-            }
-          }}
-          className="flex items-center justify-center gap-1.5 w-full py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-md text-xs font-bold transition-all shadow-xs"
-        >
-          <span>Open /admin</span>
-          <ExternalLink className="w-3 h-3" />
-        </a>
-      </div>
+      )}
     </aside>
   );
 }

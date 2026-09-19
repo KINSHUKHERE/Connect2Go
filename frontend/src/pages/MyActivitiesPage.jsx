@@ -13,15 +13,42 @@ export function MyActivitiesPage({ onOpenCreate, onOpenChat, onComingSoon }) {
   const [activeTab, setActiveTab] = useState('hosted'); // 'hosted' | 'joined'
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Activities hosted by the current user (matches user name or default)
+  // Activities hosted by the current user
   const hostedActivities = activities.filter(
-    a => (a.creator?.name === user?.name || a.creator_name === user?.name || a.id.startsWith('act-'))
+    a => user && (a.creator?.name === user.name || a.creator_name === user.name)
   );
 
   // Activities joined by user
   const joinedActivities = activities.filter(
-    a => a.isJoined || (a.joinedCount > 1 && a.creator?.name !== user?.name)
+    a => user && (a.isJoined || (a.joinedCount > 1 && a.creator?.name !== user.name))
   );
+
+  if (!user) {
+    return (
+      <div className="w-full max-w-xl mx-auto py-16 px-4 text-center space-y-5">
+        <div className="w-16 h-16 rounded-3xl bg-brand-50 border border-brand-200 text-brand-600 flex items-center justify-center mx-auto text-2xl shadow-soft">
+          <Calendar className="w-8 h-8 text-brand-600" />
+        </div>
+        <div className="space-y-1.5">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-dark-text tracking-tight">
+            Sign In to View Your Activities
+          </h2>
+          <p className="text-xs sm:text-sm text-dark-muted max-w-md mx-auto leading-relaxed">
+            Manage your hosted meetups, review incoming join requests, and track events you're participating in.
+          </p>
+        </div>
+        <div className="flex justify-center gap-3 pt-2">
+          <Button
+            variant="primary"
+            onClick={onOpenCreate}
+            className="font-bold text-xs shadow-xs"
+          >
+            Sign In / Register
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const displayList = activeTab === 'hosted' ? hostedActivities : joinedActivities;
 

@@ -30,7 +30,7 @@ export function getActivityImage(activity) {
 }
 
 export function getSafeAvatar(name = 'User', avatarUrl) {
-  if (avatarUrl && avatarUrl.startsWith('http')) {
+  if (avatarUrl && (avatarUrl.startsWith('http') || avatarUrl.startsWith('data:') || avatarUrl.startsWith('blob:'))) {
     return avatarUrl;
   }
   const cleanSeed = encodeURIComponent(name.trim() || 'User');

@@ -336,8 +336,124 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
   }
 });
 
-// 5. Admin Metrics
+// Helper to extract Cloudinary public_id from URL
+function extractCloudinaryPublicId(url) {
+  if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return null;
+  try {
+    const cleanUrl = url.split('?')[0];
+    const uploadIndex = cleanUrl.indexOf('/upload/');
+    if (uploadIndex === -1) return null;
+    let path = cleanUrl.substring(uploadIndex + '/upload/'.length);
+    const segments = path.split('/');
+    let startIndex = 0;
+    for (let i = 0; i < segments.length; i++) {
+      if (/^v\d+$/.test(segments[i])) {
+        startIndex = i + 1;
+        break;
+      }
+    }
+    const publicIdWithExt = segments.slice(startIndex).join('/');
+    const lastDotIndex = publicIdWithExt.lastIndexOf('.');
+    return lastDotIndex !== -1 ? publicIdWithExt.substring(0, lastDotIndex) : publicIdWithExt;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 4b. Permanent Cloudinary Image Deletion
+app.delete('/api/upload', async (req, res) => {
+  try {
+    let { public_id, url } = req.body || {};
+    if (!public_id && req.query.public_id) public_id = req.query.public_id;
+    if (!url && req.query.url) url = req.query.url;
+
+    if (!public_id && url) {
+      public_id = extractCloudinaryPublicId(url);
+    }
+
+    if (!public_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'No public_id or valid Cloudinary URL provided for deletion'
+      });
+    }
+
+    if (!isCloudinaryBackendConfigured) {
+      return res.status(503).json({
+        success: false,
+        message: 'Cloudinary configuration pending. Image reference cleared locally.',
+        public_id
+      });
+    }
+
+    const result = await cloudinary.uploader.destroy(public_id, {
+      invalidate: true,
+      resource_type: 'image'
+    });
+
+    console.log(`[Cloudinary Destroy] ${public_id}:`, result);
+
+    return res.json({
+      success: true,
+      result: result.result,
+      public_id,
+      message: 'Avatar image permanently removed from Cloudinary'
+    });
+  } catch (err) {
+    console.error('[Cloudinary Destroy Error]', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/upload/delete', async (req, res) => {
+  try {
+    let { public_id, url } = req.body || {};
+    if (!public_id && url) {
+      public_id = extractCloudinaryPublicId(url);
+    }
+
+    if (!public_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'No public_id or valid Cloudinary URL provided for deletion'
+      });
+    }
+
+    if (!isCloudinaryBackendConfigured) {
+      return res.status(503).json({
+        success: false,
+        message: 'Cloudinary configuration pending. Image reference cleared locally.',
+        public_id
+      });
+    }
+
+    const result = await cloudinary.uploader.destroy(public_id, {
+      invalidate: true,
+      resource_type: 'image'
+    });
+
+    console.log(`[Cloudinary Destroy POST] ${public_id}:`, result);
+
+    return res.json({
+      success: true,
+      result: result.result,
+      public_id,
+      message: 'Avatar image permanently removed from Cloudinary'
+    });
+  } catch (err) {
+    console.error('[Cloudinary Destroy Error]', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 5. Admin Metrics (Protected)
 app.get('/api/admin/metrics', async (req, res) => {
+  const adminEmail = req.headers['x-admin-email'] || req.query.admin_email;
+  // If requester identifies with a non-admin email, block access
+  if (adminEmail && adminEmail.toLowerCase() !== 'herekinshuk@gmail.com') {
+    return res.status(403).json({ success: false, message: 'Forbidden: Administrator privileges required' });
+  }
+
   try {
     let userCount = 10482;
     let activityCount = fallbackActivities.length;
