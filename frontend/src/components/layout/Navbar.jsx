@@ -4,7 +4,6 @@ import {
   LogIn, 
   Bell, 
   PlusCircle, 
-  MessageCircle, 
   User, 
   Shield, 
   Settings, 
@@ -16,7 +15,6 @@ import { useGeo } from '../../context/GeoContext.jsx';
 import { Button } from '../ui/Button.jsx';
 import { getSafeAvatar } from '../../utils/imageUtils.js';
 import { NotificationDropdown } from './NotificationDropdown.jsx';
-import { MessageDropdown } from './MessageDropdown.jsx';
 
 export function Navbar({ 
   activeTab, 
@@ -149,9 +147,6 @@ export function Navbar({
             <MapPin className="w-3.5 h-3.5 text-brand-600 shrink-0" />
             <span className="truncate max-w-[140px]">{locationName}</span>
           </div>
-
-          {/* WhatsApp-Style Messages Popup & Direct Navigation */}
-          <MessageDropdown onOpenMessagesPage={() => handleSelectTab('messages')} />
 
           {/* Live Activity & Safety Notifications Tray */}
           <NotificationDropdown

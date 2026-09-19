@@ -23,9 +23,8 @@ Unlike traditional feed-based social media, **Connect2Go is hyper-local, activit
 3. **All-India Geocoding:** Search any street, colony, campus, ground, town, or village across India (powered by Mapbox Places with smart fallback).
 4. **Algorithmic Compatibility Engine:** Multi-factor matching scoring peers based on spatial distance, shared hobbies, weekly schedule overlap, and skill level.
 5. **Real-Time Messaging Hub (`/messages`):** WhatsApp Web style 2-column interface with live status, sent/read receipts, dual-reveal handshake protocol, and celebration confetti.
-6. **WhatsApp-Style Navbar Message Dropdown:** Instant hover/click popup in the top navigation bar showing active peer chats, recent messages, and unread reply count badges.
-7. **Dedicated Pages Architecture:** Distinct, bookmarkable pages for Discover (`/`), Matched Peers (`/matches`), My Activities (`/my-activities`), Messages (`/messages`), Profile (`/profile`), Settings & Privacy (`/settings`), Safety & Trust (`/safety`), and Admin (`/admin`).
-8. **Universal Search Engine:** Dedicated, responsive search bars on every page with instant filtering, quick-clear (`X`) buttons, and intuitive empty states.
+6. **Dedicated Pages Architecture:** Distinct, bookmarkable pages for Discover (`/`), Matched Peers (`/matches`), My Activities (`/my-activities`), Messages (`/messages`), Profile (`/profile`), Settings & Privacy (`/settings`), Safety & Trust (`/safety`), and Admin (`/admin`).
+7. **Universal Search Engine:** Dedicated, responsive search bars on every page with instant filtering, quick-clear (`X`) buttons, and intuitive empty states.
 
 ---
 
@@ -39,10 +38,10 @@ Unlike traditional feed-based social media, **Connect2Go is hyper-local, activit
 - **My Activities (`/my-activities`):** Search bar filtering hosted or joined activities by title, sport category, location, or description.
 - **Map & Location Pickers:** Debounced search for cities, grounds, campuses, and areas across India with 1-click clear buttons.
 
-### 💬 2. Real-Time Chat & WhatsApp-Style Navbar Dropdown
+### 💬 2. Real-Time Chat & Handshake Protocol (`/messages`)
 - **Full-Screen Chat Hub (`/messages`):** WhatsApp Web inspired layout featuring active conversations, live online/offline indicators, timestamped message stream, and dual-reveal handshake protocol.
-- **Navbar Message Dropdown:** Hover or click the message icon in the top navigation bar to view a WhatsApp-style popup showing contact names, avatars, online status, last message snippets with checkmarks, timestamps, and active reply counters.
-- **Reply Counter Badge:** Displays the exact count of active chats where peers have replied, synchronizing dynamically across the navigation bar, landing page launcher, and chat hub.
+- **Privacy Handshake:** Mutual reveal protocol keeping users anonymous until both confirm, celebrated with canvas confetti.
+- **Live Counter Sync:** Keeps track of active conversations with replies and message notifications across tabs.
 
 ### 🧠 3. Multi-Factor Compatibility Engine (`/matches`)
 - Scores partners nearby using a 4-pillar compatibility algorithm:
