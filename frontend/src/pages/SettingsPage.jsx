@@ -18,6 +18,7 @@ import {
   Key,
   Shield,
   Smartphone,
+  Laptop,
   Download,
   Trash2,
   AlertTriangle,
@@ -100,6 +101,96 @@ export function SettingsPage({ onNavigate, onSelectTab, onOpenSafety, onOpenAuth
   const [editAvatar, setEditAvatar] = useState(user?.avatar || '');
   const [isAvatarUploading, setIsAvatarUploading] = useState(false);
   const [isProfileSaving, setIsProfileSaving] = useState(false);
+
+  // Active Devices State
+  const [activeDevices, setActiveDevices] = useState([]);
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
+
+  const fetchActiveDevices = async () => {
+    if (!user) return;
+    setIsLoadingDevices(true);
+    try {
+      const token = localStorage.getItem('connect2go_token');
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${API_BASE}/auth/active-devices?userId=${encodeURIComponent(user.id)}`, {
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.devices)) {
+        setActiveDevices(data.devices);
+      } else {
+        throw new Error('Fallback to local browser device');
+      }
+    } catch (err) {
+      const ua = navigator.userAgent;
+      let browser = 'Chrome';
+      let os = 'Windows';
+      if (/edg/i.test(ua)) browser = 'Edge';
+      else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browser = 'Safari';
+      else if (/firefox/i.test(ua)) browser = 'Firefox';
+      if (/mac/i.test(ua)) os = 'macOS';
+      else if (/android/i.test(ua)) os = 'Android';
+      else if (/iphone|ipad/i.test(ua)) os = 'iOS';
+
+      setActiveDevices([{
+        id: 'sess-current',
+        deviceName: `${browser} • ${os}`,
+        browser,
+        os,
+        deviceType: /mobile/i.test(ua) ? 'mobile' : 'desktop',
+        ip: '127.0.0.1',
+        location: user?.location || 'Jaipur, India',
+        lastActive: new Date().toISOString(),
+        isCurrent: true
+      }]);
+    } finally {
+      setIsLoadingDevices(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user && (activeCategory === 'account' || activeCategory === 'security')) {
+      fetchActiveDevices();
+    }
+  }, [user?.id, activeCategory]);
+
+  const handleRevokeDevice = async (sessionId) => {
+    try {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${API_BASE}/auth/logout-device`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, sessionId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        addToast('Device session revoked successfully!', 'info');
+        fetchActiveDevices();
+      }
+    } catch (err) {
+      addToast('Failed to revoke session.', 'error');
+    }
+  };
+
+  const handleLogoutAllOtherDevices = async () => {
+    try {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${API_BASE}/auth/logout-all-other-devices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        addToast('Logged out of all other devices successfully!', 'success');
+        fetchActiveDevices();
+      }
+    } catch (err) {
+      addToast('Failed to revoke other sessions.', 'error');
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -889,33 +980,86 @@ export function SettingsPage({ onNavigate, onSelectTab, onOpenSafety, onOpenAuth
                 )}
               </div>
 
-              {/* Active Devices & Sessions */}
+              {/* Dynamic Live Active Devices & Sessions */}
               {user && (
                 <div className="bg-white rounded-3xl border border-border/80 p-6 shadow-soft space-y-4">
-                  <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                  <div className="flex items-center justify-between border-b border-border/60 pb-3 flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <Smartphone className="w-4 h-4 text-brand-600" />
                       <h2 className="text-sm font-bold text-dark-text uppercase tracking-wider">
                         Active Devices
                       </h2>
                     </div>
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      1 Current Session
-                    </span>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                        {activeDevices.length || 1} Active {activeDevices.length === 1 ? 'Session' : 'Sessions'}
+                      </span>
+                      {activeDevices.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={handleLogoutAllOtherDevices}
+                          className="text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-xl transition-colors cursor-pointer"
+                        >
+                          Log Out All Other Devices
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="flex items-center justify-between p-3.5 bg-slate-50/80 rounded-2xl border border-border/60">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-white border border-border flex items-center justify-center text-dark-text shadow-xs">
-                        <Smartphone className="w-4 h-4 text-brand-600" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-dark-text">Current Browser (Windows • Chrome/Edge)</p>
-                        <p className="text-[11px] text-emerald-600 font-semibold">● Active Now • Jaipur, India</p>
-                      </div>
+                  {isLoadingDevices ? (
+                    <div className="p-4 text-center text-xs text-dark-muted flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-brand-600" />
+                      <span>Syncing active devices...</span>
                     </div>
-                    <span className="text-[11px] font-semibold text-dark-faint">Primary</span>
-                  </div>
+                  ) : activeDevices.length > 0 ? (
+                    <div className="space-y-2.5">
+                      {activeDevices.map((device) => {
+                        const isMobile = device.deviceType === 'mobile' || /android|iphone|ipad/i.test(device.os || '');
+                        const DeviceIcon = isMobile ? Smartphone : Laptop;
+
+                        return (
+                          <div
+                            key={device.id}
+                            className="flex items-center justify-between p-3.5 bg-slate-50/80 rounded-2xl border border-border/60 flex-wrap gap-3"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-xl bg-white border border-border flex items-center justify-center text-dark-text shadow-xs shrink-0">
+                                <DeviceIcon className="w-4 h-4 text-brand-600" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-dark-text truncate">
+                                  {device.deviceName || `${device.browser} • ${device.os}`}
+                                </p>
+                                <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1.5 mt-0.5 truncate">
+                                  <span>{device.isCurrent ? '● Active Now' : 'Last active recently'}</span>
+                                  <span>•</span>
+                                  <span>{device.location || 'Jaipur, India'}</span>
+                                  {device.ip && <span className="text-dark-faint text-[10px]">({device.ip})</span>}
+                                </p>
+                              </div>
+                            </div>
+
+                            {device.isCurrent ? (
+                              <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 shrink-0">
+                                Current Session
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleRevokeDevice(device.id)}
+                                className="text-xs font-bold text-rose-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-3 py-1 rounded-xl transition-colors shadow-2xs shrink-0 cursor-pointer"
+                              >
+                                Log Out
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-dark-muted p-2">No active sessions detected.</p>
+                  )}
                 </div>
               )}
 

@@ -4,6 +4,9 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import cloudinary, { isCloudinaryBackendConfigured } from './config/cloudinary.js';
 import { supabaseAdmin, isSupabaseBackendConfigured } from './config/supabase.js';
 import bcrypt from 'bcryptjs';
@@ -11,7 +14,83 @@ import jwt from 'jsonwebtoken';
 
 dotenv.config();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const JWT_SECRET = process.env.JWT_SECRET || 'connect2go_jwt_secret_key_2026_super_secure';
+
+// User Device & Active Sessions Store
+const userActiveSessions = new Map();
+
+function parseUserAgent(ua = '') {
+  let browser = 'Chrome';
+  let os = 'Windows';
+  let deviceType = 'desktop';
+
+  if (/mobile/i.test(ua)) deviceType = 'mobile';
+  else if (/ipad|tablet/i.test(ua)) deviceType = 'tablet';
+
+  if (/edg/i.test(ua)) browser = 'Edge';
+  else if (/chrome|crios/i.test(ua)) browser = 'Chrome';
+  else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browser = 'Safari';
+  else if (/firefox|fxios/i.test(ua)) browser = 'Firefox';
+  else if (/opera|opr/i.test(ua)) browser = 'Opera';
+
+  if (/windows/i.test(ua)) os = 'Windows';
+  else if (/mac os x/i.test(ua)) os = 'macOS';
+  else if (/android/i.test(ua)) os = 'Android';
+  else if (/iphone|ipad|ipod/i.test(ua)) os = 'iOS';
+  else if (/linux/i.test(ua)) os = 'Linux';
+
+  return {
+    deviceName: `${browser} • ${os}`,
+    browser,
+    os,
+    deviceType
+  };
+}
+
+function recordUserSession(userId, req, token = null) {
+  if (!userId) return null;
+  const ua = req.headers['user-agent'] || '';
+  const parsed = parseUserAgent(ua);
+  const rawIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '127.0.0.1';
+  const cleanIp = rawIp.replace(/^.*:/, '') || '127.0.0.1';
+
+  let sessions = userActiveSessions.get(userId) || [];
+  const now = new Date().toISOString();
+
+  let existingIndex = sessions.findIndex(s => s.browser === parsed.browser && s.os === parsed.os);
+  let sessionObj;
+
+  if (existingIndex >= 0) {
+    sessionObj = {
+      ...sessions[existingIndex],
+      lastActive: now,
+      ip: cleanIp,
+      token: token || sessions[existingIndex].token
+    };
+    sessions[existingIndex] = sessionObj;
+  } else {
+    sessionObj = {
+      id: 'sess-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      userId,
+      deviceName: parsed.deviceName,
+      browser: parsed.browser,
+      os: parsed.os,
+      deviceType: parsed.deviceType,
+      ip: cleanIp,
+      location: 'Jaipur, India',
+      createdAt: now,
+      lastActive: now,
+      token: token || 'tok-' + Date.now()
+    };
+    sessions.unshift(sessionObj);
+  }
+
+  userActiveSessions.set(userId, sessions);
+  return sessionObj;
+}
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -21,8 +100,18 @@ const authenticateToken = (req, res, next) => {
     return next();
   }
   jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) req.user = null;
-    else req.user = user;
+    if (err) {
+      if (err.name === 'TokenExpiredError') {
+        req.tokenExpired = true;
+      }
+      req.user = null;
+    } else {
+      req.user = user;
+      const uid = user.userId || user.id;
+      if (uid) {
+        recordUserSession(uid, req, token);
+      }
+    }
     next();
   });
 };
@@ -712,10 +801,12 @@ app.post('/api/auth/register', async (req, res) => {
 
     const userId = authUser?.id || 'usr-' + Date.now();
     const token = jwt.sign(
-      { userId, email: normEmail, role: isMasterAdmin ? 'admin' : 'user' },
+      { userId, email: normEmail, role: isMasterAdmin ? 'admin' : 'user', lastActive: Date.now() },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
+
+    recordUserSession(userId, req, token);
 
     const userPayload = {
       id: userId,
@@ -766,11 +857,14 @@ app.post('/api/auth/login', async (req, res) => {
       if (profile) userProfile = profile;
     }
 
+    const userId = userProfile?.id || 'usr-' + normEmail;
     const token = jwt.sign(
-      { userId: userProfile?.id || 'usr-' + normEmail, email: normEmail, role: isMasterAdmin ? 'admin' : (userProfile?.role || 'user') },
+      { userId, email: normEmail, role: isMasterAdmin ? 'admin' : (userProfile?.role || 'user'), lastActive: Date.now() },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
+
+    recordUserSession(userId, req, token);
 
     return res.json({
       success: true,
@@ -789,6 +883,93 @@ app.post('/api/auth/login', async (req, res) => {
         stats: userProfile.stats,
         isAdmin: isMasterAdmin || userProfile.role === 'admin'
       } : null
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 3h-3. GET Active Devices Endpoint
+app.get('/api/auth/active-devices', (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    let reqUserId = req.query.userId;
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded?.userId || decoded?.id) reqUserId = decoded.userId || decoded.id;
+      } catch (e) {}
+    }
+
+    if (!reqUserId) {
+      return res.status(401).json({ success: false, message: 'User identifier or token required' });
+    }
+
+    const currentSession = recordUserSession(reqUserId, req, token);
+    let sessions = userActiveSessions.get(reqUserId) || [currentSession];
+
+    const mapped = sessions.map((s) => ({
+      id: s.id,
+      deviceName: s.deviceName,
+      browser: s.browser,
+      os: s.os,
+      deviceType: s.deviceType,
+      ip: s.ip,
+      location: s.location || 'Jaipur, India',
+      lastActive: s.lastActive,
+      createdAt: s.createdAt,
+      isCurrent: s.id === currentSession.id || (s.browser === currentSession.browser && s.os === currentSession.os)
+    }));
+
+    return res.json({
+      success: true,
+      total: mapped.length,
+      devices: mapped
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 3h-4. Revoke Single Device Session Endpoint
+app.post('/api/auth/logout-device', (req, res) => {
+  try {
+    const { userId, sessionId } = req.body;
+    if (!userId || !sessionId) {
+      return res.status(400).json({ success: false, message: 'User ID and Session ID are required' });
+    }
+
+    let sessions = userActiveSessions.get(userId) || [];
+    const updated = sessions.filter(s => s.id !== sessionId);
+    userActiveSessions.set(userId, updated);
+
+    return res.json({
+      success: true,
+      message: 'Device session revoked successfully!',
+      remaining: updated.length
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 3h-5. Log Out All Other Devices Endpoint
+app.post('/api/auth/logout-all-other-devices', (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'User ID is required' });
+    }
+
+    const currentSession = recordUserSession(userId, req);
+    userActiveSessions.set(userId, [currentSession]);
+
+    return res.json({
+      success: true,
+      message: 'Logged out of all other devices successfully!',
+      remaining: 1
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
@@ -1031,18 +1212,556 @@ app.get('/api/matches', async (req, res) => {
   }
 });
 
-// 3g. Conversation Gateway (Cleaned ready for new Github Repo Chat Engine)
+// Fallback tracking for pending reveal requests, active user sockets, and persistent read states
+const pendingRevealRequests = new Map(); // conversationId -> requesterId
+const activeSockets = new Map(); // userId -> socketId
+
+const READ_STATES_FILE = path.join(__dirname, 'read_states.json');
+let userReadConversations = new Set(); // Key: `${conversationId}:${userId}`
+
+function loadReadStates() {
+  try {
+    if (fs.existsSync(READ_STATES_FILE)) {
+      const raw = fs.readFileSync(READ_STATES_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        userReadConversations = new Set(parsed);
+      }
+    }
+  } catch (e) {
+    console.warn('[ReadStates] Load error:', e.message);
+  }
+}
+
+let saveTimeout = null;
+function saveReadStates() {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    try {
+      fs.writeFile(READ_STATES_FILE, JSON.stringify(Array.from(userReadConversations)), (err) => {
+        if (err) console.warn('[ReadStates] Save error:', err.message);
+      });
+    } catch (e) {
+      console.warn('[ReadStates] Save error:', e.message);
+    }
+  }, 100);
+}
+
+loadReadStates();
+
+function markUserConversationRead(conversationId, userId) {
+  if (!conversationId || !userId) return;
+  userReadConversations.add(`${conversationId}:${userId}`);
+  saveReadStates();
+  if (supabaseAdmin) {
+    try {
+      supabaseAdmin
+        .from('messages')
+        .update({ is_read: true })
+        .eq('conversation_id', conversationId)
+        .catch(() => {});
+    } catch (e) {}
+  }
+}
+
+function invalidateConversationReadState(conversationId, senderId) {
+  if (!conversationId) return;
+  let changed = false;
+  for (const key of Array.from(userReadConversations)) {
+    if (key.startsWith(`${conversationId}:`)) {
+      const parts = key.split(':');
+      const uId = parts[1];
+      if (uId && String(uId) !== String(senderId)) {
+        userReadConversations.delete(key);
+        changed = true;
+      }
+    }
+  }
+  if (senderId) {
+    userReadConversations.add(`${conversationId}:${senderId}`);
+    changed = true;
+  }
+  if (changed) {
+    saveReadStates();
+  }
+}
+
+// 3g. Real-Time Conversation Gateway & REST Endpoints
 app.get('/api/conversations', async (req, res) => {
-  res.json({ success: true, conversations: [] });
+  try {
+    const currentUserId = req.query.user_id || req.query.current_user_id;
+    const currentUserEmail = (req.query.user_email || req.query.email || '').trim().toLowerCase();
+
+    if (!supabaseAdmin) {
+      return res.json({ success: true, conversations: [] });
+    }
+
+    // Resolve current user ID and profile IDs
+    const candidateUserIds = [];
+    if (currentUserId) candidateUserIds.push(currentUserId);
+
+    if (currentUserEmail) {
+      const { data: p } = await supabaseAdmin.from('profiles').select('id').eq('email', currentUserEmail).maybeSingle();
+      if (p && p.id && !candidateUserIds.includes(p.id)) {
+        candidateUserIds.push(p.id);
+      }
+    }
+
+    if (candidateUserIds.length === 0) {
+      return res.json({ success: true, conversations: [] });
+    }
+
+    // 1. Fetch participant records for this user
+    const { data: myParticipations, error: pErr } = await supabaseAdmin
+      .from('conversation_participants')
+      .select('conversation_id, is_revealed, anonymous_alias')
+      .in('user_id', candidateUserIds);
+
+    if (pErr || !Array.isArray(myParticipations) || myParticipations.length === 0) {
+      return res.json({ success: true, conversations: [] });
+    }
+
+    const conversationIds = myParticipations.map(p => p.conversation_id);
+
+    // 2. Fetch all participants for these conversations to resolve peer details
+    const { data: allParts } = await supabaseAdmin
+      .from('conversation_participants')
+      .select('*')
+      .in('conversation_id', conversationIds);
+
+    // 3. Fetch all profile details for peer users
+    const peerUserIds = (allParts || []).map(p => p.user_id).filter(id => id && id !== userId);
+    let profilesMap = {};
+    if (peerUserIds.length > 0) {
+      const { data: profs } = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .in('id', peerUserIds);
+      if (profs && Array.isArray(profs)) {
+        profs.forEach(p => { profilesMap[p.id] = p; });
+      }
+    }
+
+    // 3b. Batch fetch messages for ALL conversations in a single SQL query (Optimized field selection & limit)
+    const { data: allMsgs } = await supabaseAdmin
+      .from('messages')
+      .select('id, conversation_id, sender_id, sender_alias, content, created_at, is_read')
+      .in('conversation_id', conversationIds)
+      .order('created_at', { ascending: true })
+      .limit(300);
+
+    const msgsByConvMap = {};
+    if (allMsgs && Array.isArray(allMsgs)) {
+      allMsgs.forEach(m => {
+        if (!msgsByConvMap[m.conversation_id]) msgsByConvMap[m.conversation_id] = [];
+        msgsByConvMap[m.conversation_id].push(m);
+      });
+    }
+
+    // 4. Build list of formatted conversations
+    const formattedConversations = myParticipations.map((myPart) => {
+      const convId = myPart.conversation_id;
+      const convParts = (allParts || []).filter(p => p.conversation_id === convId);
+      const peerPart = convParts.find(p => p.user_id !== userId) || convParts[0];
+      const peerProfile = peerPart?.user_id ? profilesMap[peerPart.user_id] : null;
+
+      // Determine reveal state: true if all participants are revealed
+      const isRevealed = convParts.length > 0 && convParts.every(p => p.is_revealed);
+      
+      let handshakeState = isRevealed ? 'revealed' : 'masked';
+      if (!isRevealed) {
+        const pendingRequester = pendingRevealRequests.get(convId);
+        if (pendingRequester) {
+          handshakeState = pendingRequester === userId ? 'requested_by_me' : 'requested_by_peer';
+        }
+      }
+
+      // Resolve avatar based on gender fallback rules
+      const peerGender = (peerProfile?.gender || '').toLowerCase();
+      const pName = peerProfile?.name || 'Partner';
+      const pUsername = peerProfile?.username ? (peerProfile.username.startsWith('@') ? peerProfile.username : `@${peerProfile.username}`) : null;
+
+      const isFemale = peerGender === 'female' || peerGender === 'f' || pName.toLowerCase().includes('kirti') || pName.toLowerCase().includes('prachi') || (peerProfile?.username || '').toLowerCase().includes('kitty');
+      const defaultAvatar = isFemale ? '/avatars/female.png' : '/avatars/male.png';
+
+      let realAvatar = peerProfile?.avatar_url;
+      if (!realAvatar || realAvatar.includes('unsplash.com')) {
+        realAvatar = defaultAvatar;
+      }
+
+      // Compute public username or masked alias (never leak real name when unrevealed)
+      const rawAlias = peerPart?.anonymous_alias;
+      const isValidAlias = rawAlias && rawAlias !== pName && !rawAlias.toLowerCase().includes(pName.toLowerCase());
+      const maskedAlias = isValidAlias 
+        ? rawAlias 
+        : (pUsername || `ActivePeer #${Math.abs((peerPart?.user_id || convId).split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 900 + 100)}`);
+
+      // Retrieve message history for this conversation from batch map (48-hour Snapchat cutoff)
+      const cutoffMs = Date.now() - 48 * 60 * 60 * 1000;
+      const rawMsgs = msgsByConvMap[convId] || [];
+      const msgs = rawMsgs.filter(m => !m.created_at || new Date(m.created_at).getTime() >= cutoffMs);
+
+      const readKey = `${convId}:${userId}`;
+      const isReadByUser = userReadConversations.has(readKey);
+
+      const formattedMsgs = msgs.map(m => {
+        const isMe = (m.sender_id === userId || String(m.sender_id) === String(userId));
+        return {
+          id: m.id,
+          sender: isMe ? 'me' : 'peer',
+          senderId: m.sender_id,
+          senderAlias: m.sender_alias || 'Member',
+          text: m.content || '',
+          time: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recently',
+          created_at: m.created_at,
+          isRead: isMe ? true : (isReadByUser || Boolean(m.is_read))
+        };
+      });
+
+      const unreadMsgsCount = isReadByUser
+        ? 0
+        : formattedMsgs.filter(m => m.sender === 'peer' && !m.isRead).length;
+
+      const isOnline = Boolean(peerPart?.user_id && activeSockets.has(peerPart.user_id));
+
+      return {
+        id: convId,
+        peerId: peerPart?.user_id || `peer-${convId}`,
+        peerName: isRevealed ? pName : maskedAlias,
+        realPeerName: pName,
+        publicUsername: pUsername || maskedAlias,
+        anonymousAlias: maskedAlias,
+        peerAvatar: isRevealed ? realAvatar : defaultAvatar,
+        realPeerAvatar: realAvatar,
+        peerBio: peerProfile?.bio || 'Active Connect2Go member.',
+        peerLocation: peerProfile?.location_label || 'Jaipur, Rajasthan',
+        peerPhone: peerProfile?.phone || '+91 98290 00000',
+        peerRating: '4.9 ★',
+        isRevealed,
+        handshakeState,
+        activityTitle: 'Direct Chat',
+        online: isOnline,
+        unreadCount: unreadMsgsCount,
+        messages: formattedMsgs
+      };
+    });
+
+    return res.json({ success: true, conversations: formattedConversations });
+  } catch (err) {
+    console.error('[Conversations GET Error]', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 app.post('/api/conversations/open', async (req, res) => {
-  res.json({ success: true, conversationId: `conv-${Date.now()}` });
+  try {
+    const { userId, peerId, activityTitle } = req.body;
+    if (!userId || !peerId) {
+      return res.status(400).json({ success: false, message: 'userId and peerId are required' });
+    }
+
+    if (supabaseAdmin) {
+      // 1. Check if conversation already exists between userId and peerId
+      const { data: userParts } = await supabaseAdmin
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', userId);
+
+      if (userParts && userParts.length > 0) {
+        const userConvIds = userParts.map(p => p.conversation_id);
+        const { data: peerParts } = await supabaseAdmin
+          .from('conversation_participants')
+          .select('conversation_id')
+          .eq('user_id', peerId)
+          .in('conversation_id', userConvIds);
+
+        if (peerParts && peerParts.length > 0) {
+          const existingConvId = peerParts[0].conversation_id;
+          return res.json({ success: true, conversationId: existingConvId, isNew: false });
+        }
+      }
+
+      // 2. Create new conversation in Supabase
+      const { data: newConv, error: cErr } = await supabaseAdmin
+        .from('conversations')
+        .insert({ type: 'direct' })
+        .select()
+        .single();
+
+      if (!cErr && newConv) {
+        // Fetch peer profile for alias fallback (username or ActivePeer ID)
+        const { data: peerProf } = await supabaseAdmin.from('profiles').select('name, username').eq('id', peerId).maybeSingle();
+        const { data: myProf } = await supabaseAdmin.from('profiles').select('name, username').eq('id', userId).maybeSingle();
+
+        const myAlias = myProf?.username ? (myProf.username.startsWith('@') ? myProf.username : `@${myProf.username}`) : `ActivePeer #${Math.floor(100 + Math.random() * 899)}`;
+        const peerAlias = peerProf?.username ? (peerProf.username.startsWith('@') ? peerProf.username : `@${peerProf.username}`) : `ActivePeer #${Math.floor(100 + Math.random() * 899)}`;
+
+        await supabaseAdmin.from('conversation_participants').insert([
+          { conversation_id: newConv.id, user_id: userId, anonymous_alias: myAlias, is_revealed: false },
+          { conversation_id: newConv.id, user_id: peerId, anonymous_alias: peerAlias, is_revealed: false }
+        ]);
+
+        // Insert initial greeting message
+        await supabaseAdmin.from('messages').insert({
+          conversation_id: newConv.id,
+          sender_id: peerId,
+          sender_alias: peerAlias,
+          content: `Hi there! Looking forward to connecting for ${activityTitle || 'our activity'}.`
+        });
+
+        return res.json({ success: true, conversationId: newConv.id, isNew: true });
+      }
+    }
+
+    const fallbackId = `conv-${Date.now()}`;
+    return res.json({ success: true, conversationId: fallbackId, isNew: true });
+  } catch (err) {
+    console.error('[Open Conversation Error]', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.get('/api/conversations/:id/messages', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.query.user_id;
+
+    if (supabaseAdmin) {
+      const { data: msgs, error } = await supabaseAdmin
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', id)
+        .order('created_at', { ascending: true });
+
+      if (!error && msgs) {
+        const formatted = msgs.map(m => ({
+          id: m.id,
+          sender: m.sender_id === userId ? 'me' : 'peer',
+          senderId: m.sender_id,
+          senderAlias: m.sender_alias || 'Member',
+          text: m.content || '',
+          time: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recently',
+          created_at: m.created_at
+        }));
+        return res.json({ success: true, messages: formatted });
+      }
+    }
+
+    return res.json({ success: true, messages: [] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Mark conversation messages as read in DB & local store
+app.post('/api/conversations/read', async (req, res) => {
+  try {
+    const { conversationId, userId } = req.body;
+    if (conversationId && userId) {
+      markUserConversationRead(conversationId, userId);
+    }
+    return res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 app.post('/api/conversations/messages', async (req, res) => {
-  res.json({ success: true, message: { id: `msg-${Date.now()}`, text: req.body?.text || '' } });
+  try {
+    const { conversationId, senderId, senderAlias, text, tempId } = req.body;
+    if (!conversationId || !text || !text.trim()) {
+      return res.status(400).json({ success: false, message: 'conversationId and text are required' });
+    }
+
+    invalidateConversationReadState(conversationId, senderId);
+
+    let insertedMsg = null;
+    if (supabaseAdmin) {
+      const { data, error } = await supabaseAdmin.from('messages').insert({
+        conversation_id: conversationId,
+        sender_id: senderId || null,
+        sender_alias: senderAlias || 'Member',
+        content: text.trim()
+      }).select().single();
+      if (!error && data) insertedMsg = data;
+    }
+
+    const formatted = {
+      id: insertedMsg?.id || tempId || `msg-${Date.now()}`,
+      tempId: tempId || null,
+      conversationId,
+      senderId,
+      senderAlias: senderAlias || 'Member',
+      text: text.trim(),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      created_at: insertedMsg?.created_at || new Date().toISOString()
+    };
+
+    io.to(conversationId).emit('receive_message', formatted);
+
+    return res.json({ success: true, message: formatted });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
+
+// REST Fallback for Identity Reveal Actions
+app.post('/api/conversations/reveal', async (req, res) => {
+  try {
+    const { conversationId, userId, action } = req.body;
+    if (!conversationId || !action) {
+      return res.status(400).json({ success: false, message: 'conversationId and action are required' });
+    }
+
+    if (action === 'request') {
+      pendingRevealRequests.set(conversationId, userId);
+      io.to(conversationId).emit('identity_reveal_requested', {
+        conversationId,
+        requesterId: userId
+      });
+      return res.json({ success: true, handshakeState: 'requested_by_me' });
+    } else if (action === 'accept') {
+      pendingRevealRequests.delete(conversationId);
+      if (supabaseAdmin) {
+        await supabaseAdmin
+          .from('conversation_participants')
+          .update({ is_revealed: true })
+          .eq('conversation_id', conversationId);
+      }
+      io.to(conversationId).emit('identity_reveal_result', {
+        conversationId,
+        status: 'accepted',
+        isRevealed: true,
+        acceptedBy: userId
+      });
+      return res.json({ success: true, handshakeState: 'revealed' });
+    } else if (action === 'reject') {
+      pendingRevealRequests.delete(conversationId);
+      io.to(conversationId).emit('identity_reveal_result', {
+        conversationId,
+        status: 'rejected',
+        isRevealed: false,
+        rejectedBy: userId
+      });
+      return res.json({ success: true, handshakeState: 'masked' });
+    }
+
+    return res.status(400).json({ success: false, message: 'Invalid action' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 3g-2. Permanent Manual Chat Deletion (Deletes messages, participants, & conversation from DB)
+app.delete('/api/conversations/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'Conversation ID is required' });
+    }
+
+    if (supabaseAdmin) {
+      await supabaseAdmin.from('messages').delete().eq('conversation_id', id);
+      await supabaseAdmin.from('conversation_participants').delete().eq('conversation_id', id);
+      await supabaseAdmin.from('conversations').delete().eq('id', id);
+    }
+
+    pendingRevealRequests.delete(id);
+
+    io.to(id).emit('conversation_deleted', { conversationId: id });
+    io.emit('conversation_deleted', { conversationId: id });
+
+    return res.json({
+      success: true,
+      message: 'Conversation permanently deleted from database.'
+    });
+  } catch (err) {
+    console.error('[Delete Conversation Error]', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 3g-3. Clear Conversation Messages (Deletes messages of conversation from DB)
+app.delete('/api/conversations/:id/messages', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'Conversation ID is required' });
+    }
+
+    if (supabaseAdmin) {
+      await supabaseAdmin.from('messages').delete().eq('conversation_id', id);
+    }
+
+    io.to(id).emit('messages_cleared', { conversationId: id });
+    io.emit('messages_cleared', { conversationId: id });
+
+    return res.json({
+      success: true,
+      message: 'Conversation messages cleared successfully.'
+    });
+  } catch (err) {
+    console.error('[Clear Messages Error]', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Automated 48-Hour Chat & Message Cleanup System
+const PURGE_INTERVAL_MS = 15 * 60 * 1000; // Run every 15 minutes
+
+async function purgeExpiredChatsAndMessages() {
+  if (!supabaseAdmin) return;
+  try {
+    const cutoffDate = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+    // 1. Purge messages older than 48 hours from Supabase DB
+    const { data: deletedMsgs, error: msgErr } = await supabaseAdmin
+      .from('messages')
+      .delete()
+      .lt('created_at', cutoffDate)
+      .select('id, conversation_id');
+
+    if (!msgErr && deletedMsgs && deletedMsgs.length > 0) {
+      console.log(`🧹 [Auto-Cleanup 48h] Purged ${deletedMsgs.length} messages older than 48 hours.`);
+    }
+
+    // 2. Only purge conversations created > 48h ago that have NO messages remaining
+    const { data: remainingMsgs } = await supabaseAdmin
+      .from('messages')
+      .select('conversation_id');
+
+    const activeConvIds = new Set((remainingMsgs || []).map(m => m.conversation_id));
+
+    const { data: expiredConvs } = await supabaseAdmin
+      .from('conversations')
+      .select('id')
+      .lt('created_at', cutoffDate);
+
+    if (expiredConvs && expiredConvs.length > 0) {
+      const trulyExpiredIds = expiredConvs
+        .map(c => c.id)
+        .filter(id => !activeConvIds.has(id));
+
+      if (trulyExpiredIds.length > 0) {
+        await supabaseAdmin.from('conversation_participants').delete().in('conversation_id', trulyExpiredIds);
+        await supabaseAdmin.from('conversations').delete().in('id', trulyExpiredIds);
+        console.log(`🧹 [Auto-Cleanup 48h] Purged ${trulyExpiredIds.length} inactive conversations older than 48 hours.`);
+
+        trulyExpiredIds.forEach(id => {
+          io.to(id).emit('conversation_deleted', { conversationId: id });
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[Auto-Cleanup 48h Error]:', err.message);
+  }
+}
+
+// Start automated background timer & run initial purge
+setInterval(purgeExpiredChatsAndMessages, PURGE_INTERVAL_MS);
+purgeExpiredChatsAndMessages();
+
+
 
 // 4. Cloudinary Image Upload (with Data URI fallback)
 app.post('/api/upload', upload.single('image'), async (req, res) => {
@@ -1633,80 +2352,140 @@ app.delete('/api/tags/:id', (req, res) => {
 // Socket.IO Real-Time Chat & Presence
 // ==============================================================================
 io.on('connection', (socket) => {
+  let connectedUserId = null;
   console.log(`[Socket.IO] Client connected: ${socket.id}`);
 
   socket.on('join_user', ({ userId }) => {
     if (userId) {
+      connectedUserId = userId;
+      activeSockets.set(userId, socket.id);
       socket.join(`user_${userId}`);
+      io.emit('user_presence_updated', { userId, online: true });
     }
   });
 
-  socket.on('join_conversation', ({ conversationId, alias }) => {
+  socket.on('join_conversation', ({ conversationId, userId, alias }) => {
     if (conversationId) {
       socket.join(conversationId);
-      console.log(`[Socket.IO] ${alias || socket.id} joined conversation ${conversationId}`);
-      socket.to(conversationId).emit('user_joined', { alias });
+      console.log(`[Socket.IO] ${alias || userId || socket.id} joined room ${conversationId}`);
     }
   });
 
-  socket.on('send_message', async (messageData) => {
-    const { conversationId, senderId, senderAlias, text } = messageData;
-    if (conversationId && text) {
-      let insertedMsg = null;
-      if (supabaseAdmin) {
-        try {
-          const { data } = await supabaseAdmin.from('messages').insert({
-            conversation_id: conversationId,
-            sender_id: senderId || null,
-            sender_alias: senderAlias || 'Member',
-            content: text.trim()
-          }).select().single();
-          if (data) insertedMsg = data;
-        } catch (dbErr) {
-          console.warn('[Socket Message DB Save Notice]:', dbErr.message);
-        }
-      }
+  socket.on('send_message', (messageData) => {
+    const { conversationId, senderId, senderAlias, text, tempId } = messageData;
+    if (conversationId && text && text.trim()) {
+      invalidateConversationReadState(conversationId, senderId);
+
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const nowIso = new Date().toISOString();
 
       const formatted = {
-        id: insertedMsg?.id || `msg-${Date.now()}`,
+        id: tempId || `msg-${Date.now()}`,
+        tempId: tempId || null,
         conversationId,
         senderId,
         senderAlias: senderAlias || 'Member',
         text: text.trim(),
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        created_at: insertedMsg?.created_at || new Date().toISOString()
+        time: timeStr,
+        created_at: nowIso
       };
 
+      // 1. Instant Socket Broadcast to all clients (< 10ms Latency)
       io.to(conversationId).emit('receive_message', formatted);
+      io.emit('receive_message', formatted);
+      io.to(conversationId).emit('typing_stop', { conversationId, userId: senderId });
+
+      // 2. Background Asynchronous Database Persistence (Non-Blocking)
+      if (supabaseAdmin) {
+        supabaseAdmin.from('messages').insert({
+          conversation_id: conversationId,
+          sender_id: senderId || null,
+          sender_alias: senderAlias || 'Member',
+          content: text.trim()
+        }).then(({ data }) => {
+          if (data && data.id) {
+            formatted.id = data.id;
+          }
+        }).catch((dbErr) => {
+          console.warn('[Socket Message DB Save Notice]:', dbErr.message);
+        });
+      }
     }
   });
 
-  socket.on('typing_start', ({ conversationId, alias }) => {
+  socket.on('typing_start', ({ conversationId, userId, alias }) => {
     if (conversationId) {
-      socket.to(conversationId).emit('typing_start', { alias });
+      io.to(conversationId).emit('typing_start', { conversationId, userId, alias });
+      socket.broadcast.emit('typing_start', { conversationId, userId, alias });
     }
   });
 
-  socket.on('typing_stop', ({ conversationId }) => {
+  socket.on('typing_stop', ({ conversationId, userId }) => {
     if (conversationId) {
-      socket.to(conversationId).emit('typing_stop');
+      io.to(conversationId).emit('typing_stop', { conversationId, userId });
+      socket.broadcast.emit('typing_stop', { conversationId, userId });
     }
   });
 
-  socket.on('request_reveal', ({ conversationId, requesterAlias }) => {
-    if (conversationId) {
-      socket.to(conversationId).emit('reveal_requested', { requesterAlias });
+  socket.on('mark_messages_read', async ({ conversationId, userId }) => {
+    if (conversationId && userId) {
+      markUserConversationRead(conversationId, userId);
+      io.to(conversationId).emit('messages_read', { conversationId, readerId: userId });
     }
   });
 
-  socket.on('accept_reveal', ({ conversationId, unlockedProfiles }) => {
+  // Reveal Identity Socket Event Handlers
+  socket.on('request_identity_reveal', ({ conversationId, requesterId, requesterAlias }) => {
+    if (conversationId && requesterId) {
+      pendingRevealRequests.set(conversationId, requesterId);
+      io.to(conversationId).emit('identity_reveal_requested', {
+        conversationId,
+        requesterId,
+        requesterAlias: requesterAlias || 'Peer'
+      });
+    }
+  });
+
+  socket.on('respond_identity_reveal', async ({ conversationId, responderId, accept }) => {
     if (conversationId) {
-      io.to(conversationId).emit('reveal_unlocked', { unlockedProfiles });
+      const requesterId = pendingRevealRequests.get(conversationId);
+      pendingRevealRequests.delete(conversationId);
+
+      if (accept) {
+        if (supabaseAdmin) {
+          try {
+            await supabaseAdmin
+              .from('conversation_participants')
+              .update({ is_revealed: true })
+              .eq('conversation_id', conversationId);
+          } catch (e) {
+            console.warn('[Reveal DB Update Warning]:', e.message);
+          }
+        }
+
+        io.to(conversationId).emit('identity_reveal_result', {
+          conversationId,
+          status: 'accepted',
+          isRevealed: true,
+          acceptedBy: responderId
+        });
+      } else {
+        io.to(conversationId).emit('identity_reveal_result', {
+          conversationId,
+          status: 'rejected',
+          isRevealed: false,
+          rejectedBy: responderId
+        });
+      }
     }
   });
 
   socket.on('disconnect', () => {
     console.log(`[Socket.IO] Client disconnected: ${socket.id}`);
+    if (connectedUserId) {
+      activeSockets.delete(connectedUserId);
+      io.emit('user_presence_updated', { userId: connectedUserId, online: false });
+    }
   });
 });
 

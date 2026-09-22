@@ -157,6 +157,8 @@ export function AuthProvider({ children }) {
         setIsAdmin(false);
         try {
           localStorage.removeItem('connect2go_user');
+          localStorage.removeItem('connect2go_token');
+          localStorage.removeItem('connect2go_last_active');
         } catch (e) {}
       }
     });
@@ -165,6 +167,78 @@ export function AuthProvider({ children }) {
       authListener?.subscription?.unsubscribe();
     };
   }, []);
+
+  // 7-Day Inactivity Auto Logout & JWT Expiration Guard
+  useEffect(() => {
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+    const checkInactivityAndJWT = () => {
+      try {
+        const lastActiveStr = localStorage.getItem('connect2go_last_active');
+        const token = localStorage.getItem('connect2go_token');
+        const now = Date.now();
+
+        if (lastActiveStr) {
+          const lastActive = Number(lastActiveStr);
+          if (!isNaN(lastActive) && (now - lastActive > SEVEN_DAYS_MS)) {
+            console.warn('⚠️ Auto-logged out: 7 days of inactivity reached.');
+            logout();
+            return true;
+          }
+        }
+
+        if (token) {
+          try {
+            const parts = token.split('.');
+            if (parts.length === 3) {
+              const payload = JSON.parse(atob(parts[1]));
+              if (payload.exp && payload.exp * 1000 < now) {
+                console.warn('⚠️ Auto-logged out: 7-day JWT token expired.');
+                logout();
+                return true;
+              }
+            }
+          } catch (e) {}
+        }
+      } catch (e) {}
+      return false;
+    };
+
+    const expired = checkInactivityAndJWT();
+
+    if (!expired && user) {
+      if (!localStorage.getItem('connect2go_last_active')) {
+        localStorage.setItem('connect2go_last_active', String(Date.now()));
+      }
+
+      let timeoutId = null;
+      const handleUserActivity = () => {
+        if (timeoutId) return;
+        timeoutId = setTimeout(() => {
+          localStorage.setItem('connect2go_last_active', String(Date.now()));
+          timeoutId = null;
+        }, 5000);
+      };
+
+      window.addEventListener('mousemove', handleUserActivity);
+      window.addEventListener('keydown', handleUserActivity);
+      window.addEventListener('click', handleUserActivity);
+      window.addEventListener('scroll', handleUserActivity);
+      window.addEventListener('touchstart', handleUserActivity);
+
+      const interval = setInterval(checkInactivityAndJWT, 5 * 60 * 1000);
+
+      return () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        clearInterval(interval);
+        window.removeEventListener('mousemove', handleUserActivity);
+        window.removeEventListener('keydown', handleUserActivity);
+        window.removeEventListener('click', handleUserActivity);
+        window.removeEventListener('scroll', handleUserActivity);
+        window.removeEventListener('touchstart', handleUserActivity);
+      };
+    }
+  }, [user?.id]);
 
   const mapSupabaseUser = (sbUser) => {
     let cachedUser = null;

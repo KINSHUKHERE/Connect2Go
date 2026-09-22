@@ -94,10 +94,10 @@ export function Navbar({
         </div>
 
         {/* Center Desktop Quick Links */}
-        <nav className="hidden md:flex items-center gap-1 bg-slate-100/80 p-1 rounded-full border border-border/50">
+        <nav className="hidden lg:flex items-center gap-1 bg-slate-100/80 p-1 rounded-full border border-border/50 shrink-0">
           <button
             onClick={() => handleSelectTab('home')}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
               activeTab === 'home'
                 ? 'bg-white text-dark-text shadow-xs font-bold'
                 : 'text-dark-muted hover:text-dark-text'
@@ -107,7 +107,7 @@ export function Navbar({
           </button>
           <button
             onClick={() => handleSelectTab('explore')}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
               activeTab === 'explore'
                 ? 'bg-white text-dark-text shadow-xs font-bold'
                 : 'text-dark-muted hover:text-dark-text'
@@ -117,7 +117,7 @@ export function Navbar({
           </button>
           <button
             onClick={() => handleNavClick('my-activities')}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
               activeTab === 'my-activities'
                 ? 'bg-white text-dark-text shadow-xs font-bold'
                 : 'text-dark-muted hover:text-dark-text'
@@ -127,7 +127,7 @@ export function Navbar({
           </button>
           <button
             onClick={() => handleNavClick('matches')}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
               activeTab === 'matches'
                 ? 'bg-white text-dark-text shadow-xs font-bold'
                 : 'text-dark-muted hover:text-dark-text'
@@ -138,16 +138,16 @@ export function Navbar({
         </nav>
 
         {/* Right Actions */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           {/* Admin Console Quick Link */}
           {Boolean(user?.isAdmin || user?.role === 'admin' || user?.email === 'herekinshuk@gmail.com') && (
             <button
               onClick={() => onNavigate('/admin')}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-800 border border-brand-200 rounded-full text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+              className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-800 border border-brand-200 rounded-full text-xs font-bold transition-colors shadow-2xs cursor-pointer shrink-0"
               title="Switch to Admin Operations Console"
             >
               <Shield className="w-3.5 h-3.5 text-brand-600" />
-              <span className="hidden md:inline">Admin Console</span>
+              <span>Admin Console</span>
               <span className="text-[9px] bg-brand-200 text-brand-900 px-1 py-0.2 rounded font-black">ADMIN</span>
             </button>
           )}
@@ -158,7 +158,7 @@ export function Navbar({
             variant="primary"
             onClick={onOpenCreate}
             icon={PlusCircle}
-            className="hidden sm:inline-flex font-bold text-xs shadow-xs"
+            className="hidden sm:inline-flex font-bold text-xs shadow-xs shrink-0"
           >
             Host Activity
           </Button>
@@ -166,11 +166,11 @@ export function Navbar({
           {/* Location Indicator with Live GPS & Map Picker */}
           <div 
             onClick={onOpenLocationPicker || (() => onComingSoon('Change Location (GPS & Map Pinning)'))}
-            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 hover:bg-brand-100/70 border border-brand-200/60 rounded-full text-xs font-medium text-brand-800 cursor-pointer transition-colors"
+            className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 hover:bg-brand-100/70 border border-brand-200/60 rounded-full text-xs font-medium text-brand-800 cursor-pointer transition-colors shrink-0"
             title="Click to change location or detect live GPS"
           >
             <MapPin className="w-3.5 h-3.5 text-brand-600 shrink-0" />
-            <span className="truncate max-w-[140px]">{locationName}</span>
+            <span className="truncate max-w-[120px]">{locationName}</span>
           </div>
 
           {/* Live Activity & Safety Notifications Tray */}

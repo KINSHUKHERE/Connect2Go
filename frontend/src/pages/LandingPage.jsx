@@ -18,7 +18,7 @@ import { handleImageError } from '../utils/imageUtils.js';
 import { useChat } from '../context/ChatContext.jsx';
 
 export function LandingPage({ onGetStarted, onExplore, onOpenMessages, onComingSoon }) {
-  const { repliedChatsCount } = useChat();
+  const { totalUnreadMessages, unreadUsersCount } = useChat();
   const popularCategories = [
     { label: 'Badminton', icon: '🏸', count: '14 nearby', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
     { label: 'Morning Run', icon: '🏃', count: '22 nearby', color: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -358,16 +358,20 @@ export function LandingPage({ onGetStarted, onExplore, onOpenMessages, onComingS
           <div className="w-9 h-9 rounded-full bg-[#00a884] text-white flex items-center justify-center shadow-xs">
             <MessageSquare className="w-4 h-4" />
           </div>
-          {repliedChatsCount > 0 && (
+          {totalUnreadMessages > 0 && (
             <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1 ring-2 ring-white animate-pulse">
-              {repliedChatsCount}
+              {totalUnreadMessages}
             </span>
           )}
         </div>
         <div className="text-left pr-1">
           <div className="text-xs font-extrabold text-dark-text leading-tight">Messages</div>
-          <div className="text-[10px] text-[#00a884] font-bold">
-            {repliedChatsCount > 0 ? `${repliedChatsCount} chats with replies` : 'Active chats'}
+          <div className={`text-[10px] font-bold ${totalUnreadMessages > 0 ? 'text-red-500 animate-pulse' : 'text-[#00a884]'}`}>
+            {totalUnreadMessages > 0
+              ? unreadUsersCount > 1
+                ? `${totalUnreadMessages} new messages (${unreadUsersCount} users)`
+                : `${totalUnreadMessages} new message${totalUnreadMessages > 1 ? 's' : ''}`
+              : 'Active chats'}
           </div>
         </div>
       </button>

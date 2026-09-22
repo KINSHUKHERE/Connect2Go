@@ -265,7 +265,13 @@ function MainApp() {
       )}
 
       {/* Main Full-Width Content Container */}
-      <main className={`flex-1 w-full ${isAuthTab ? 'p-0' : 'px-4 sm:px-6 lg:px-10 py-6'}`}>
+      <main className={`flex-1 w-full ${
+        isAuthTab 
+          ? 'p-0' 
+          : activeTab === 'messages' 
+            ? 'px-2 sm:px-4 lg:px-6 py-1 sm:py-2 flex flex-col min-h-0' 
+            : 'px-4 sm:px-6 lg:px-10 py-6'
+      }`}>
           {activeTab === 'home' && (
             <LandingPage
               onGetStarted={() => handleSelectTab('explore')}

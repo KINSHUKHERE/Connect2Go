@@ -1,7 +1,15 @@
 import React from 'react';
 import { Home, Compass, Plus, MessageCircle, Settings } from 'lucide-react';
+import { useChat } from '../../context/ChatContext.jsx';
 
 export function BottomNavigation({ currentTab, setCurrentTab, onOpenCreate, onOpenChat }) {
+  const { activeConversationId, totalUnreadMessages } = useChat();
+
+  // Hide bottom navigation on mobile/split view when active chat thread is open
+  if (currentTab === 'messages' && activeConversationId) {
+    return null;
+  }
+
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-white/95 backdrop-blur-md border-t border-border/80 px-3 py-2 flex items-center justify-around shadow-lg">
       <button
@@ -41,7 +49,9 @@ export function BottomNavigation({ currentTab, setCurrentTab, onOpenCreate, onOp
       >
         <MessageCircle className="w-5 h-5" />
         <span className="text-[11px] font-medium">Chat</span>
-        <span className="absolute top-1 right-2 w-2 h-2 bg-emerald-500 rounded-full"></span>
+        {totalUnreadMessages > 0 && (
+          <span className="absolute top-1 right-2 w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+        )}
       </button>
 
       <button
