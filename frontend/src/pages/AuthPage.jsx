@@ -564,7 +564,7 @@ export function AuthPage({ mode = 'signin', onNavigate }) {
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Kinshuk Khandelwal"
+                      placeholder="e.g. Alex Johnson"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className="w-full h-10 pl-9 pr-3 bg-slate-50/70 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#22C55E] focus:bg-white focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
@@ -588,7 +588,7 @@ export function AuthPage({ mode = 'signin', onNavigate }) {
                       <input
                         type="text"
                         required
-                        placeholder="e.g. prachi_jain99"
+                        placeholder="e.g. alex_j24"
                         value={username}
                         onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                         className="w-full h-10 pl-8 pr-3 bg-slate-50/70 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#22C55E] focus:bg-white focus:ring-2 focus:ring-[#22C55E]/20 transition-all font-semibold"
