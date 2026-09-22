@@ -160,81 +160,22 @@ export function AdminDashboardPage({ currentPath, onNavigate, onBackToUserPanel 
   // Reports filter
   const [reportStatusFilter, setReportStatusFilter] = useState('All');
 
-  // Fetch all dynamic data from Backend & Supabase Database with progressive state updates
+  // High Speed Single-Trip Data Fetcher for instant Admin Dashboard load
   const fetchAllAdminData = async (showLoading = false) => {
     if (showLoading) setIsLoadingData(true);
-
-    const pUsers = fetch(`${API_BASE}/users`).then(r => r.json()).then(uRes => {
-      if (uRes?.success && Array.isArray(uRes.data)) {
-        const nonAdminUsers = uRes.data.filter(u => 
-          u.role !== 'admin' && 
-          u.username !== 'kinshuk_admin' && 
-          (u.email || '').toLowerCase() !== 'herekinshuk@gmail.com'
-        );
-        setUsersList(nonAdminUsers);
-      }
-    }).catch(e => console.error('Error fetching users:', e));
-
-    const pMatches = fetch(`${API_BASE}/matches`).then(r => r.json()).then(mRes => {
-      if (mRes?.success && Array.isArray(mRes.data)) {
-        setMatchesList(mRes.data.map(m => ({
-          id: m.id,
-          peer1: m.peer1 || { name: m.user1?.name || 'User 1', avatar: m.user1?.avatar, location: 'Jaipur' },
-          peer2: m.peer2 || { name: m.user2?.name || 'User 2', avatar: m.user2?.avatar, location: 'Jaipur' },
-          activity: m.activity,
-          score: m.score || m.affinityScore || 92,
-          date: m.date || m.meetupDate || 'Today',
-          handshake: m.handshake || m.handshakeState || 'Revealed',
-          status: m.status || 'Active Chat'
-        })));
-      }
-    }).catch(e => console.error('Error fetching matches:', e));
-
-    const pReports = fetch(`${API_BASE}/reports`).then(r => r.json()).then(rRes => {
-      if (rRes?.success && Array.isArray(rRes.reports)) {
-        setReportsList(rRes.reports.map(r => ({
-          id: r.id,
-          reporterName: r.reporterName || r.reporter || 'Verified Member',
-          reporterEmail: r.reporterEmail || 'member@connect2go.local',
-          reportedUser: r.reportedUser || r.target,
-          category: r.category || r.reason,
-          details: r.details || r.description,
-          screenshot: r.screenshot || null,
-          createdAt: r.createdAt || r.time || new Date().toISOString(),
-          status: r.status,
-          adminNotes: r.adminNotes || r.adminNote || '',
-          updatedAt: new Date().toISOString()
-        })));
-      }
-    }).catch(e => console.error('Error fetching reports:', e));
-
-    const pTags = fetch(`${API_BASE}/tags`).then(r => r.json()).then(tRes => {
-      if (tRes?.success && Array.isArray(tRes.tags)) {
-        setTagsList(tRes.tags.map(t => ({
-          id: t.id,
-          name: t.name,
-          icon: t.emoji || t.icon || '🏷️',
-          category: t.category,
-          count: t.meetupsCount || 0,
-          active: true
-        })));
-      }
-    }).catch(e => console.error('Error fetching tags:', e));
-
-    const pMetrics = fetch(`${API_BASE}/admin/metrics?admin_email=herekinshuk@gmail.com`).then(r => r.json()).then(metRes => {
-      if (metRes?.success && metRes.metrics) {
-        setLiveMetrics(metRes.metrics);
-      }
-    }).catch(e => console.error('Error fetching metrics:', e));
-
-    const pActivities = fetch(`${API_BASE}/activities?radius=50000`).then(r => r.json()).then(actRes => {
-      if (actRes?.success && Array.isArray(actRes.data)) {
-        setActivitiesList(actRes.data);
-      }
-    }).catch(e => console.error('Error fetching activities:', e));
-
     try {
-      await Promise.allSettled([pUsers, pMatches, pReports, pTags, pMetrics, pActivities]);
+      const res = await fetch(`${API_BASE}/admin/all-data`);
+      const data = await res.json();
+      if (data?.success) {
+        if (Array.isArray(data.users)) setUsersList(data.users);
+        if (Array.isArray(data.matches)) setMatchesList(data.matches);
+        if (Array.isArray(data.reports)) setReportsList(data.reports);
+        if (Array.isArray(data.tags)) setTagsList(data.tags);
+        if (Array.isArray(data.activities)) setActivitiesList(data.activities);
+        if (data.metrics) setLiveMetrics(data.metrics);
+      }
+    } catch (e) {
+      console.error('Fast Admin fetch error:', e);
     } finally {
       if (showLoading) setIsLoadingData(false);
     }

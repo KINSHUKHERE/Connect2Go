@@ -1402,7 +1402,168 @@ app.post('/api/upload/delete', async (req, res) => {
   }
 });
 
-// 5. Admin Metrics (Protected, dynamic counts directly from Supabase DB)
+// 5. Admin Metrics & Single-Trip High Speed All-Data Endpoint
+app.get('/api/admin/all-data', async (req, res) => {
+  try {
+    const lat = 26.7725;
+    const lon = 75.8753;
+
+    if (!supabaseAdmin) {
+      return res.json({
+        success: true,
+        users: [],
+        matches: [],
+        reports: [],
+        tags: dynamicTags,
+        metrics: { totalUsers: 0, activeActivities: 0, pendingReports: 0, totalMatches: 0 },
+        activities: fallbackActivities
+      });
+    }
+
+    // Single-trip parallel queries executed concurrently against Supabase DB
+    const [authRes, profRes, actRes, convRes, partRes, repRes] = await Promise.all([
+      supabaseAdmin.auth.admin.listUsers().catch(() => ({ data: { users: [] } })),
+      supabaseAdmin.from('profiles').select('*').order('created_at', { ascending: false }),
+      supabaseAdmin.from('activities').select('*').order('created_at', { ascending: false }),
+      supabaseAdmin.from('conversations').select('*').order('created_at', { ascending: false }),
+      supabaseAdmin.from('conversation_participants').select('*'),
+      supabaseAdmin.from('reports').select('*').order('created_at', { ascending: false })
+    ]);
+
+    const authUserMap = {};
+    if (authRes.data && Array.isArray(authRes.data.users)) {
+      authRes.data.users.forEach(u => {
+        if (u.id && u.email) authUserMap[u.id] = u.email;
+      });
+    }
+
+    const rawProfiles = profRes.data || [];
+    const allActivities = actRes.data || [];
+    const allConversations = convRes.data || [];
+    const allParticipants = partRes.data || [];
+    const rawReports = repRes.data || [];
+
+    // Map Users with live dynamic activity and match counts
+    const validProfiles = rawProfiles.filter(p => p.role !== 'admin' && p.username !== 'kinshuk_admin');
+    const users = validProfiles.map(p => {
+      const pNameNorm = String(p.name || '').trim().toLowerCase();
+      const pUsernameNorm = String(p.username || '').trim().toLowerCase();
+      const pGenderStr = String(p.gender || '').trim().toLowerCase();
+      const isFemale = pGenderStr === 'female' || pGenderStr === 'f' || pNameNorm.includes('kirti') || pNameNorm.includes('prachi') || pUsernameNorm.includes('kitty') || pUsernameNorm.includes('pj');
+      const pGender = isFemale ? 'Female' : 'Male';
+      const defaultAvatar = isFemale ? '/avatars/female.png' : '/avatars/male.png';
+
+      let resolvedAvatar = p.avatar_url;
+      if (!resolvedAvatar || resolvedAvatar.includes('unsplash.com')) {
+        resolvedAvatar = defaultAvatar;
+      }
+
+      const authEmail = authUserMap[p.id];
+      const resolvedEmail = authEmail || p.email || `${(p.username || 'user')}@gmail.com`;
+
+      const dynamicActivitiesCount = allActivities.filter(a => {
+        if (a.creator_id && a.creator_id === p.id) return true;
+        const cName = String(a.creator_name || '').trim().toLowerCase();
+        if (cName && (cName === pNameNorm || cName === pUsernameNorm)) return true;
+        return false;
+      }).length;
+
+      const dynamicMatchesCount = allParticipants.filter(cp => cp.user_id === p.id).length;
+
+      return {
+        id: p.id,
+        name: p.name,
+        username: p.username || (p.name || 'user').toLowerCase().replace(/\s+/g, '_'),
+        gender: pGender,
+        email: resolvedEmail,
+        phone: p.phone || '+91 98290 00000',
+        avatar: resolvedAvatar,
+        bio: p.bio || 'Ready to connect and discover activities nearby!',
+        interests: Array.isArray(p.interests) && p.interests.length > 0 ? p.interests : ['Badminton', 'Fitness', 'Study'],
+        location: p.location_label || 'Jaipur, Rajasthan',
+        trustScore: Number(p.reliability_score) || 100,
+        status: p.stats?.status || 'Active',
+        activitiesCount: dynamicActivitiesCount,
+        matchesCount: dynamicMatchesCount,
+        role: p.role || 'user',
+        joined: p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'
+      };
+    });
+
+    // Map Matches / Pairings
+    const matches = allConversations.map(c => {
+      const parts = allParticipants.filter(cp => cp.conversation_id === c.id);
+      const user1 = users.find(u => u.id === parts[0]?.user_id) || { name: 'Member 1', avatar: '/avatars/female.png', location: 'Jaipur' };
+      const user2 = users.find(u => u.id === parts[1]?.user_id) || { name: 'Member 2', avatar: '/avatars/female.png', location: 'Jaipur' };
+
+      return {
+        id: c.id,
+        peer1: user1,
+        peer2: user2,
+        activity: 'Direct Match',
+        score: 95,
+        date: c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Today',
+        handshake: 'Revealed',
+        status: 'Active Chat'
+      };
+    });
+
+    // Map Reports
+    const reports = rawReports.map(r => {
+      let details = {};
+      try {
+        details = typeof r.details === 'string' ? JSON.parse(r.details) : (r.details || {});
+      } catch (e) {
+        details = { description: r.details };
+      }
+      return {
+        id: r.id,
+        reporterName: details.reporter_name || 'Verified Member',
+        reporterEmail: 'member@connect2go.local',
+        reportedUser: r.target_name,
+        category: r.reason,
+        details: details.description || (typeof r.details === 'string' ? r.details : 'No incident details provided'),
+        screenshot: details.screenshot || null,
+        createdAt: r.created_at ? new Date(r.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' }) : 'Recent',
+        status: details.displayStatus || r.status || 'Pending Review',
+        adminNotes: details.adminNote || ''
+      };
+    });
+
+    // Compute Live Metrics
+    const metrics = {
+      totalUsers: users.length,
+      activeActivities: allActivities.length,
+      pendingReports: reports.filter(r => (r.status || '').toLowerCase().includes('pending')).length,
+      totalMatches: matches.length,
+      matchRate: matches.length > 0 ? '100%' : '0%',
+      activeTagsCount: dynamicTags.length
+    };
+
+    const tagsFormatted = dynamicTags.map(t => ({
+      id: t.id,
+      name: t.name,
+      icon: t.emoji || t.icon || '🏷️',
+      category: t.category,
+      count: t.meetupsCount || 0,
+      active: true
+    }));
+
+    return res.json({
+      success: true,
+      users,
+      matches,
+      reports,
+      tags: tagsFormatted,
+      metrics,
+      activities: allActivities
+    });
+  } catch (err) {
+    console.error('[Admin All-Data Error]', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 app.get('/api/admin/metrics', async (req, res) => {
   const adminEmail = req.headers['x-admin-email'] || req.query.admin_email;
   if (adminEmail && adminEmail.toLowerCase() !== 'herekinshuk@gmail.com') {
