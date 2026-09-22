@@ -149,7 +149,7 @@ app.get('/api/activities', async (req, res) => {
             current_participants: a.current_participants || 1,
             time_slot: a.time_slot || 'Today',
             creator_name: a.creator_name || 'Member',
-            creator_avatar: a.creator_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+            creator_avatar: a.creator_avatar || '/avatars/male.png',
             status: a.status || 'open',
             distance_km: dist,
             created_at: a.created_at
@@ -192,7 +192,7 @@ app.post('/api/activities', async (req, res) => {
       current_participants: 1,
       time_slot: time_slot || 'Today, Evening',
       creator_name: creator_name || 'Connect2Go Member',
-      creator_avatar: creator_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      creator_avatar: creator_avatar || '/avatars/male.png',
       status: 'open',
       created_at: new Date().toISOString()
     };
@@ -325,17 +325,29 @@ app.get(['/api/users', '/api/profiles'], async (req, res) => {
 
     if (supabaseAdmin) {
       const authUserMap = {};
+      let allActivities = [];
+      let allParticipants = [];
+
       try {
-        const { data: authData } = await supabaseAdmin.auth.admin.listUsers();
-        if (authData && Array.isArray(authData.users)) {
-          authData.users.forEach(u => {
-            if (u.id && u.email) {
-              authUserMap[u.id] = u.email;
-            }
+        const [authRes, actRes, partRes] = await Promise.all([
+          supabaseAdmin.auth.admin.listUsers(),
+          supabaseAdmin.from('activities').select('id, creator_id, creator_name'),
+          supabaseAdmin.from('conversation_participants').select('id, conversation_id, user_id')
+        ]);
+
+        if (authRes.data && Array.isArray(authRes.data.users)) {
+          authRes.data.users.forEach(u => {
+            if (u.id && u.email) authUserMap[u.id] = u.email;
           });
         }
+        if (actRes.data && Array.isArray(actRes.data)) {
+          allActivities = actRes.data;
+        }
+        if (partRes.data && Array.isArray(partRes.data)) {
+          allParticipants = partRes.data;
+        }
       } catch (aErr) {
-        console.warn('[List Users Auth Fetch Notice]', aErr.message);
+        console.warn('[List Users Sub-fetch Notice]', aErr.message);
       }
 
       let query = supabaseAdmin
@@ -391,8 +403,30 @@ app.get(['/api/users', '/api/profiles'], async (req, res) => {
           const authEmail = authUserMap[p.id];
           const resolvedEmail = authEmail || p.email || (isAdminUser ? 'herekinshuk@gmail.com' : `${(p.username || 'user')}@gmail.com`);
           const resolvedPhone = p.phone || (isAdminUser ? '+91 98291 99999' : '+91 98290 00000');
-          const pGender = p.gender || 'Male';
-          const defaultAvatar = pGender.toLowerCase() === 'female' ? '/avatars/female.png' : '/avatars/male.png';
+          const pNameNorm = String(p.name || '').trim().toLowerCase();
+          const pUsernameNorm = String(p.username || '').trim().toLowerCase();
+          const pGenderStr = String(p.gender || '').trim().toLowerCase();
+          const isFemale = pGenderStr === 'female' || pGenderStr === 'f' || pNameNorm.includes('kirti') || pNameNorm.includes('prachi') || pUsernameNorm.includes('kitty') || pUsernameNorm.includes('pj');
+          const pGender = isFemale ? 'Female' : 'Male';
+          const defaultAvatar = isFemale ? '/avatars/female.png' : '/avatars/male.png';
+
+          // Strictly filter out any Unsplash URLs to use default gender avatars when user didn't upload custom photo
+          let resolvedAvatar = p.avatar_url;
+          if (!resolvedAvatar || resolvedAvatar.includes('unsplash.com')) {
+            resolvedAvatar = defaultAvatar;
+          }
+
+          // Compute real hosted activities count dynamically from database
+          const dynamicActivitiesCount = allActivities.filter(a => {
+            if (a.creator_id && a.creator_id === p.id) return true;
+            const cName = String(a.creator_name || '').trim().toLowerCase();
+            if (cName && (cName === pNameNorm || cName === pUsernameNorm)) return true;
+            return false;
+          }).length;
+
+          // Compute real matches / conversations count dynamically from database
+          const dynamicMatchesCount = allParticipants.filter(cp => cp.user_id === p.id).length;
+
           return {
             id: p.id,
             name: p.name,
@@ -400,14 +434,14 @@ app.get(['/api/users', '/api/profiles'], async (req, res) => {
             gender: pGender,
             email: resolvedEmail,
             phone: resolvedPhone,
-            avatar: p.avatar_url || defaultAvatar,
+            avatar: resolvedAvatar,
             bio: p.bio || (isAdminUser ? 'Platform Administrator & Creator of Connect2Go.' : 'Ready to connect and discover activities nearby!'),
             interests: Array.isArray(p.interests) && p.interests.length > 0 ? p.interests : ['Badminton', 'Fitness', 'Study'],
             location: p.location_label || 'Jaipur, Rajasthan',
-            trustScore: Number(p.reliability_score) || 98,
+            trustScore: Number(p.reliability_score) || 100,
             status: p.stats?.status || 'Active',
-            activitiesCount: p.stats?.activities ?? 0,
-            matchesCount: p.stats?.matches ?? 0,
+            activitiesCount: dynamicActivitiesCount,
+            matchesCount: dynamicMatchesCount,
             distanceKm: dist,
             role: p.role || 'user',
             joined: p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'
