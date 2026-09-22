@@ -2,158 +2,44 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import { detectLiveGpsLocation, reverseGeocodeIndia } from '../utils/geoService.js';
+import { useAuth } from './AuthContext.jsx';
+import { getActivityImage } from '../utils/imageUtils.js';
 
 const GeoContext = createContext(null);
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 const SOCKET_URL = 'http://localhost:5000';
 
-export const SAMPLE_ACTIVITIES = [
-  {
-    id: 'act-1',
-    title: 'Evening Badminton Doubles Rally',
-    category: 'Sports',
-    distanceKm: 1.2,
-    date: 'Today',
-    time: '6:00 PM',
-    time_slot: 'Today, 6:00 PM - 7:30 PM',
-    locationName: 'Campus Sports Arena, Court 2',
-    location_label: 'Campus Sports Arena, Court 2',
-    lat: 26.7725,
-    lng: 75.8753,
-    participantCount: 4,
-    joinedCount: 2,
-    creator: {
-      name: 'Kinshuk K.',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-      badge: 'Intermediate Player'
-    },
-    imageUrl: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600&auto=format&fit=crop&q=80',
-    matchScore: 95,
-    description: 'Looking for 2 more players for an informal friendly badminton rally at the campus indoor courts.'
-  },
-  {
-    id: 'act-2',
-    title: 'Morning 5K Jog & Cardio Session',
-    category: 'Fitness',
-    distanceKm: 0.8,
-    date: 'Tomorrow',
-    time: '6:30 AM',
-    time_slot: 'Tomorrow, 6:30 AM',
-    locationName: 'Central Park Green Loop',
-    location_label: 'Central Park Green Loop',
-    lat: 26.7740,
-    lng: 75.8765,
-    participantCount: 5,
-    joinedCount: 3,
-    creator: {
-      name: 'Lavanshu B.',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
-      badge: 'Casual Runner'
-    },
-    imageUrl: 'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=600&auto=format&fit=crop&q=80',
-    matchScore: 88,
-    description: 'Easy pace 5k morning run followed by light stretching. All fitness levels welcome, let’s stay consistent!'
-  },
-  {
-    id: 'act-3',
-    title: 'Weekend Chess Blitz & Coffee',
-    category: 'Gaming',
-    distanceKm: 1.9,
-    date: 'Saturday',
-    time: '4:00 PM',
-    time_slot: 'Saturday, 4:00 PM',
-    locationName: 'Student Center Lounge',
-    location_label: 'Student Center Lounge',
-    lat: 26.7710,
-    lng: 75.8730,
-    participantCount: 2,
-    joinedCount: 1,
-    creator: {
-      name: 'Lavish G.',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80',
-      badge: 'Blitz Player'
-    },
-    imageUrl: 'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?w=600&auto=format&fit=crop&q=80',
-    matchScore: 82,
-    description: 'Casual 5+3 blitz games and tactics over iced cold brews at the cafeteria.'
-  },
-  {
-    id: 'act-4',
-    title: 'Fullstack Dev & Hackathon Prep',
-    category: 'Study',
-    distanceKm: 2.4,
-    date: 'Friday',
-    time: '5:00 PM',
-    time_slot: 'Friday, 5:00 PM - 8:00 PM',
-    locationName: 'Central Innovation Lab',
-    location_label: 'Central Innovation Lab',
-    lat: 26.7735,
-    lng: 75.8780,
-    participantCount: 4,
-    joinedCount: 2,
-    creator: {
-      name: 'Kirti S.',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80',
-      badge: 'Frontend Dev'
-    },
-    imageUrl: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?w=600&auto=format&fit=crop&q=80',
-    matchScore: 91,
-    description: 'Working on React & Supabase architectures, exploring spatial queries and building cool side projects together.'
-  },
-];
+export const SAMPLE_ACTIVITIES = [];
+export const SAMPLE_PEOPLE = [];
 
-export const SAMPLE_PEOPLE = [
-  {
-    id: 'p-1',
-    name: 'Rohan Sharma',
-    distanceKm: 2.1,
-    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&auto=format&fit=crop&q=80',
-    commonInterests: 3,
-    interests: ['Badminton', 'Running', 'Fitness'],
-    status: 'Online',
-  },
-  {
-    id: 'p-2',
-    name: 'Priya Mehta',
-    distanceKm: 1.5,
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80',
-    commonInterests: 4,
-    interests: ['Running', 'Yoga', 'Travel', 'Music'],
-    status: 'Online',
-  },
-  {
-    id: 'p-3',
-    name: 'Arjun Verma',
-    distanceKm: 3.1,
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
-    commonInterests: 2,
-    interests: ['Football', 'Gaming'],
-    status: 'Away',
-  },
-  {
-    id: 'p-4',
-    name: 'Sneha Rao',
-    distanceKm: 2.8,
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80',
-    commonInterests: 3,
-    interests: ['Coding', 'Photography', 'Music'],
-    status: 'Online',
-  },
-];
+const getInitialLocation = () => {
+  try {
+    const saved = localStorage.getItem('connect2go_user_location');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.lat && parsed.lng) {
+        return parsed;
+      }
+    }
+  } catch (e) {}
+  return { lat: 26.7725, lng: 75.8753, name: 'Poornima Campus Hub' };
+};
 
 export function GeoProvider({ children }) {
-  const [coordinates, setCoordinates] = useState({ lat: 26.7725, lng: 75.8753 });
-  const [locationName, setLocationName] = useState('Poornima Campus Hub');
-  const [radiusKm, setRadiusKm] = useState(5);
+  const { user } = useAuth();
+  const initialLoc = getInitialLocation();
+  const [coordinates, setCoordinates] = useState({ lat: initialLoc.lat, lng: initialLoc.lng });
+  const [locationName, setLocationName] = useState(initialLoc.name || 'Poornima Campus Hub');
+  const [radiusKm, setRadiusKm] = useState(15);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('grid');
-  const [activities, setActivities] = useState(SAMPLE_ACTIVITIES);
-  const [people, setPeople] = useState(SAMPLE_PEOPLE);
+  const [activities, setActivities] = useState([]);
+  const [people, setPeople] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch activities from Backend (Supabase / In-memory)
+  // Fetch activities dynamically from Backend (Supabase PostgreSQL)
   const fetchActivities = async () => {
     setIsLoading(true);
     try {
@@ -167,43 +53,120 @@ export function GeoProvider({ children }) {
         timeout: 4000
       });
 
-      if (res.data?.success && res.data?.data && res.data.data.length > 0) {
-        // Map backend format to UI card format
+      if (res.data?.success && Array.isArray(res.data?.data)) {
         const mapped = res.data.data.map(item => ({
           id: item.id,
           title: item.title,
           category: item.category,
-          distanceKm: item.distance_km || 1.0,
+          distanceKm: item.distance_km ?? 1.0,
           date: 'Upcoming',
           time: item.time_slot || 'Today',
           time_slot: item.time_slot || 'Today',
-          locationName: item.location_label || 'Nearby Venue',
-          location_label: item.location_label || 'Nearby Venue',
+          locationName: item.location_label || 'Jaipur Hub',
+          location_label: item.location_label || 'Jaipur Hub',
           lat: item.lat || coordinates.lat,
           lng: item.lon || coordinates.lng,
           participantCount: item.max_participants || 4,
           joinedCount: item.current_participants || 1,
           creator: {
             name: item.creator_name || 'Member',
-            avatar: item.creator_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-            badge: 'Active Member'
+            avatar: item.creator_avatar || '/avatars/male.png',
+            badge: 'Host'
           },
-          imageUrl: item.image_url || 'https://images.unsplash.com/photo-1517649763962-0c623266ddc0?w=600&auto=format&fit=crop&q=80',
-          matchScore: 92,
+          imageUrl: getActivityImage({ title: item.title, category: item.category, imageUrl: item.image_url }),
+          matchScore: 94,
           description: item.description
         }));
         setActivities(mapped);
       }
     } catch (err) {
-      console.warn('Backend activity fetch failed, retaining default activities:', err.message);
+      console.warn('Backend activity fetch failed:', err.message);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Fetch nearby peers dynamically from Backend (Supabase Profiles)
+  const fetchPeople = async () => {
+    try {
+      let activeUser = user;
+      if (!activeUser) {
+        try {
+          const stored = localStorage.getItem('connect2go_user');
+          if (stored) activeUser = JSON.parse(stored);
+        } catch (e) {}
+      }
+
+      const res = await axios.get(`${API_BASE}/users`, {
+        params: {
+          lat: coordinates.lat,
+          lon: coordinates.lng,
+          current_user_id: activeUser?.id,
+          current_user_email: activeUser?.email
+        },
+        timeout: 4000
+      });
+
+      if (res.data?.success && Array.isArray(res.data?.data)) {
+        // Exclude admin & exclude current user's own profile completely
+        const nonSelfPeers = res.data.data.filter(p => {
+          const isAdmin = p.role === 'admin' || p.username === 'kinshuk_admin' || (p.email || '').toLowerCase() === 'herekinshuk@gmail.com';
+          const isSelf = activeUser && (
+            (activeUser.id && p.id === activeUser.id) ||
+            (activeUser.email && (p.email || '').toLowerCase() === (activeUser.email || '').toLowerCase()) ||
+            (activeUser.username && (p.username || '').toLowerCase() === (activeUser.username || '').toLowerCase())
+          );
+          return !isAdmin && !isSelf;
+        });
+
+        const mappedPeople = nonSelfPeers.map(p => ({
+          id: p.id,
+          name: p.name,
+          username: p.username || (p.name || 'user').toLowerCase().replace(/\s+/g, '_'),
+          gender: p.gender || 'Male',
+          email: p.email,
+          distanceKm: p.distanceKm ?? 1.2,
+          avatar: p.avatar,
+          bio: p.bio,
+          interests: Array.isArray(p.interests) && p.interests.length > 0 ? p.interests : ['Badminton', 'Fitness', 'Study'],
+          status: p.status === 'Active' ? 'Online' : p.status,
+          trustScore: p.trustScore || 95
+        }));
+        setPeople(mappedPeople);
+      }
+    } catch (err) {
+      console.warn('Backend users fetch error:', err.message);
+    }
+  };
+
+  const syncLocationToBackend = async (latVal, lngVal, nameVal) => {
+    try {
+      let activeUser = user;
+      if (!activeUser) {
+        try {
+          const stored = localStorage.getItem('connect2go_user');
+          if (stored) activeUser = JSON.parse(stored);
+        } catch (e) {}
+      }
+
+      if (activeUser?.id || activeUser?.email) {
+        await axios.post(`${API_BASE}/users/location`, {
+          userId: activeUser.id,
+          userEmail: activeUser.email,
+          lat: latVal,
+          lon: lngVal,
+          location_label: nameVal
+        });
+      }
+    } catch (e) {}
+  };
+
+  // Synchronize on mount and parameter changes
   useEffect(() => {
     fetchActivities();
-  }, [selectedCategory, radiusKm]);
+    fetchPeople();
+    syncLocationToBackend(coordinates.lat, coordinates.lng, locationName);
+  }, [selectedCategory, radiusKm, coordinates, locationName]);
 
   // Connect Socket.IO for real-time live activity creation
   useEffect(() => {
@@ -227,14 +190,24 @@ export function GeoProvider({ children }) {
           joinedCount: 1,
           creator: {
             name: newAct.creator_name || 'Member',
-            avatar: newAct.creator_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+            avatar: newAct.creator_avatar || '/avatars/male.png',
             badge: 'Host'
           },
-          imageUrl: 'https://images.unsplash.com/photo-1517649763962-0c623266ddc0?w=600&auto=format&fit=crop&q=80',
+          imageUrl: getActivityImage({ title: newAct.title, category: newAct.category }),
           matchScore: 95,
           description: newAct.description
         };
-        setActivities(prev => [formatted, ...prev.filter(a => a.id !== formatted.id)]);
+        setActivities(prev => {
+          const exists = prev.some(a => a.id === formatted.id || (a.title === formatted.title && a.creator?.name === formatted.creator.name));
+          if (exists) {
+            return prev.map(a => (a.id === formatted.id || (a.title === formatted.title && a.creator?.name === formatted.creator.name)) ? formatted : a);
+          }
+          return [formatted, ...prev];
+        });
+      });
+
+      socket.on('user_location_updated', () => {
+        fetchPeople();
       });
     } catch (e) {
       // socket fallback
@@ -247,28 +220,39 @@ export function GeoProvider({ children }) {
 
   // Create new activity via Backend API
   const addActivity = async (newAct) => {
+    const actWithImg = {
+      ...newAct,
+      imageUrl: getActivityImage(newAct)
+    };
+
     try {
       const payload = {
-        title: newAct.title,
-        category: newAct.category,
-        description: newAct.description,
-        location_label: newAct.locationName || newAct.location_label || locationName,
-        lat: newAct.lat || coordinates.lat,
-        lon: newAct.lng || coordinates.lng,
-        max_participants: newAct.participantCount || 4,
-        time_slot: newAct.time || newAct.time_slot || 'Today',
-        creator_name: newAct.creator?.name || 'You',
-        creator_avatar: newAct.creator?.avatar
+        title: actWithImg.title,
+        category: actWithImg.category,
+        description: actWithImg.description,
+        location_label: actWithImg.locationName || actWithImg.location_label || locationName,
+        lat: actWithImg.lat || coordinates.lat,
+        lon: actWithImg.lng || coordinates.lng,
+        max_participants: actWithImg.participantCount || 4,
+        time_slot: actWithImg.time || actWithImg.time_slot || 'Today',
+        creator_name: actWithImg.creator?.name || 'You',
+        creator_avatar: actWithImg.creator?.avatar
       };
 
       const res = await axios.post(`${API_BASE}/activities`, payload);
       if (res.data?.data) {
         const created = res.data.data;
         const formatted = {
-          ...newAct,
-          id: created.id || `act-${Date.now()}`
+          ...actWithImg,
+          id: created.id || actWithImg.id
         };
-        setActivities(prev => [formatted, ...prev]);
+        setActivities(prev => {
+          const exists = prev.some(a => a.id === formatted.id || (a.title === formatted.title && a.creator?.name === formatted.creator.name));
+          if (exists) {
+            return prev.map(a => (a.id === formatted.id || (a.title === formatted.title && a.creator?.name === formatted.creator.name)) ? formatted : a);
+          }
+          return [formatted, ...prev];
+        });
         return;
       }
     } catch (err) {
@@ -276,7 +260,11 @@ export function GeoProvider({ children }) {
     }
 
     // Local fallback
-    setActivities((prev) => [newAct, ...prev]);
+    setActivities((prev) => {
+      const exists = prev.some(a => a.id === actWithImg.id || (a.title === actWithImg.title && a.creator?.name === actWithImg.creator.name));
+      if (exists) return prev;
+      return [actWithImg, ...prev];
+    });
   };
 
   // Join / Express Interest in an activity
@@ -322,9 +310,16 @@ export function GeoProvider({ children }) {
     setIsDetectingLocation(true);
     try {
       const loc = await detectLiveGpsLocation();
-      setCoordinates({ lat: loc.lat, lng: loc.lng });
+      const numLat = Number(loc.lat);
+      const numLng = Number(loc.lng);
+      setCoordinates({ lat: numLat, lng: numLng });
       setLocationName(loc.locationName);
+      try {
+        localStorage.setItem('connect2go_user_location', JSON.stringify({ lat: numLat, lng: numLng, name: loc.locationName, isManual: false }));
+      } catch (e) {}
+      syncLocationToBackend(numLat, numLng, loc.locationName);
       fetchActivities();
+      fetchPeople();
       setIsDetectingLocation(false);
       return { success: true, location: loc };
     } catch (err) {
@@ -336,9 +331,17 @@ export function GeoProvider({ children }) {
 
   // Change location to any city or place in India
   const setCustomLocation = (lat, lng, name) => {
-    setCoordinates({ lat, lng });
+    const numLat = Number(lat);
+    const numLng = Number(lng);
+    const finalName = name || locationName;
+    setCoordinates({ lat: numLat, lng: numLng });
     if (name) setLocationName(name);
+    try {
+      localStorage.setItem('connect2go_user_location', JSON.stringify({ lat: numLat, lng: numLng, name: finalName, isManual: true }));
+    } catch (e) {}
+    syncLocationToBackend(numLat, numLng, finalName);
     fetchActivities();
+    fetchPeople();
   };
 
   return (
@@ -365,7 +368,12 @@ export function GeoProvider({ children }) {
         setCustomLocation,
         isDetectingLocation,
         isLoading,
-        refreshActivities: fetchActivities
+        refreshActivities: fetchActivities,
+        refreshPeople: fetchPeople,
+        refreshData: () => {
+          fetchActivities();
+          fetchPeople();
+        }
       }}
     >
       {children}

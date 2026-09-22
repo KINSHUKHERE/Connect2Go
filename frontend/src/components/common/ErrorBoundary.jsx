@@ -33,6 +33,11 @@ export class ErrorBoundary extends React.Component {
             <p className="text-xs text-dark-muted leading-relaxed">
               We encountered an unexpected display glitch. Don't worry, your data and preferences are safe.
             </p>
+            {this.state.error && (
+              <div className="p-3 bg-red-50 text-red-700 text-xs font-mono text-left rounded-xl border border-red-200 overflow-auto max-h-40">
+                {this.state.error.message || String(this.state.error)}
+              </div>
+            )}
             <Button
               variant="primary"
               size="sm"

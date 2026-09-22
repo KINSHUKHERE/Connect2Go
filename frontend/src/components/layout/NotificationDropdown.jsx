@@ -11,71 +11,11 @@ import {
   MessageCircle
 } from 'lucide-react';
 
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: 'n1',
-    type: 'handshake',
-    title: 'Reveal Identity Request',
-    description: 'Rohan Sharma wants to complete the Dual Reveal Handshake for Badminton Session.',
-    time: '12m ago',
-    unread: true,
-    actionType: 'chat',
-    peer: {
-      name: 'Rohan Sharma',
-      avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&auto=format&fit=crop&q=80',
-      interests: ['Badminton', 'Running', 'Fitness'],
-      distanceKm: 0.8,
-    }
-  },
-  {
-    id: 'n2',
-    type: 'join',
-    title: 'Partner Joined Activity',
-    description: 'Aarav Patel joined your "React & GenAI Coding Sprint" at Malviya Nagar.',
-    time: '42m ago',
-    unread: true,
-    actionType: 'activity'
-  },
-  {
-    id: 'n3',
-    type: 'match',
-    title: 'High Compatibility Match (95%)',
-    description: 'Priya Sharma is also looking for an evening running partner within 1.2 km.',
-    time: '2h ago',
-    unread: true,
-    actionType: 'matches'
-  },
-  {
-    id: 'n4',
-    type: 'safety',
-    title: 'Privacy Fuzzing Active',
-    description: 'Your location is protected with ~400m neighbourhood jitter for public listings.',
-    time: '5h ago',
-    unread: false,
-    actionType: 'settings'
-  }
-];
-
 export function NotificationDropdown({ onOpenChat, onSelectTab, onOpenSettings }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState(() => {
-    try {
-      const stored = localStorage.getItem('connect2go_notifications');
-      return stored ? JSON.parse(stored) : INITIAL_NOTIFICATIONS;
-    } catch {
-      return INITIAL_NOTIFICATIONS;
-    }
-  });
+  const [notifications, setNotifications] = useState([]);
 
   const containerRef = useRef(null);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('connect2go_notifications', JSON.stringify(notifications));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [notifications]);
 
   // Handle outside click
   useEffect(() => {
@@ -101,14 +41,13 @@ export function NotificationDropdown({ onOpenChat, onSelectTab, onOpenSettings }
   };
 
   const handleNotificationClick = (notif) => {
-    // Mark this one as read
     setNotifications((prev) =>
       prev.map((n) => (n.id === notif.id ? { ...n, unread: false } : n))
     );
     setIsOpen(false);
 
     if (notif.actionType === 'chat' && onOpenChat) {
-      onOpenChat(notif.peer || { name: 'Rohan Sharma' });
+      onOpenChat(notif.peer || { name: 'Partner' });
     } else if (notif.actionType === 'matches' && onSelectTab) {
       onSelectTab('matches');
     } else if (notif.actionType === 'activity' && onSelectTab) {
@@ -134,110 +73,106 @@ export function NotificationDropdown({ onOpenChat, onSelectTab, onOpenSettings }
 
   return (
     <div className="relative" ref={containerRef}>
-      {/* Bell Trigger Button */}
       <button
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="w-9 h-9 rounded-full border border-border/80 flex items-center justify-center text-dark-muted hover:text-dark-text hover:bg-slate-50 transition-colors relative"
-        title="Notifications"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`relative p-2.5 rounded-2xl border transition-all duration-200 focus:outline-none ${
+          isOpen
+            ? 'bg-brand-50 border-brand-300 text-brand-700 shadow-xs ring-2 ring-brand-100'
+            : 'bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700 shadow-2xs hover:shadow-xs'
+        }`}
         aria-label="Notifications"
-        aria-expanded={isOpen}
       >
         <Bell className="w-4 h-4" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-extrabold rounded-full flex items-center justify-center px-1 ring-2 ring-white animate-pulse">
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-brand-600 text-white text-[10px] font-extrabold flex items-center justify-center border-2 border-white shadow-xs animate-pulse">
             {unreadCount}
           </span>
         )}
       </button>
 
-      {/* Popover Menu */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-border/90 z-50 overflow-hidden text-left animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="absolute right-0 mt-2.5 w-80 sm:w-96 bg-white border border-slate-200/90 rounded-3xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
           
-          {/* Top Bar */}
-          <div className="px-4 py-3 border-b border-border/70 bg-slate-50/80 flex items-center justify-between">
+          {/* Header */}
+          <div className="p-4 bg-gradient-to-r from-slate-50 via-white to-brand-50/40 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h3 className="text-xs sm:text-sm font-bold text-dark-text">Activity Alerts</h3>
-              {unreadCount > 0 && (
-                <span className="text-[10px] font-bold bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full">
+              <div className="w-7 h-7 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center">
+                <Bell className="w-3.5 h-3.5" />
+              </div>
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                Notifications
+              </h3>
+              {unreadCount > 0 ? (
+                <span className="px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 border border-brand-200 text-[10px] font-bold">
                   {unreadCount} new
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-bold">
+                  0 Unread
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              {unreadCount > 0 && (
+            {notifications.length > 0 && (
+              <div className="flex items-center gap-2">
                 <button
                   onClick={markAllAsRead}
-                  className="text-[11px] text-brand-600 hover:text-brand-700 font-semibold transition-colors"
+                  className="text-[11px] font-bold text-slate-600 hover:text-brand-600 transition-colors flex items-center gap-1"
                 >
-                  Mark read
+                  <Check className="w-3 h-3 text-emerald-600" /> Read all
                 </button>
-              )}
-              {notifications.length > 0 && (
                 <button
                   onClick={clearAll}
-                  className="text-slate-400 hover:text-red-500 transition-colors p-1"
-                  title="Clear all notifications"
+                  className="text-[11px] font-bold text-slate-400 hover:text-red-500 transition-colors"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  Clear
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
-          {/* List of Notifications */}
-          <div className="max-h-80 overflow-y-auto divide-y divide-border/50">
+          {/* List or Empty State */}
+          <div className="max-h-80 overflow-y-auto divide-y divide-slate-100/80">
             {notifications.length === 0 ? (
-              <div className="p-8 text-center text-dark-muted space-y-2">
-                <Bell className="w-8 h-8 mx-auto text-slate-300 stroke-1" />
-                <p className="text-xs font-semibold">No notifications yet</p>
-                <p className="text-[11px] text-dark-faint">Activity joins and reveal handshakes will appear here.</p>
+              <div className="py-10 px-6 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 border border-brand-100 flex items-center justify-center mx-auto shadow-xs">
+                  <Bell className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-extrabold text-slate-800">
+                    No notifications yet
+                  </p>
+                  <p className="text-[11px] text-slate-500 max-w-xs mx-auto leading-relaxed">
+                    Activity requests, mutual matches, and safety alerts will appear here in real-time.
+                  </p>
+                </div>
               </div>
             ) : (
               notifications.map((n) => (
                 <div
                   key={n.id}
                   onClick={() => handleNotificationClick(n)}
-                  className={`p-3.5 hover:bg-slate-50/80 transition-colors cursor-pointer flex items-start gap-3 relative ${
-                    n.unread ? 'bg-brand-50/30' : ''
+                  className={`p-4 flex items-start gap-3.5 hover:bg-slate-50/80 cursor-pointer transition-colors ${
+                    n.unread ? 'bg-brand-50/50 border-l-4 border-l-brand-500' : ''
                   }`}
                 >
-                  <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200/70 flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="p-2 rounded-2xl bg-slate-100/80 border border-slate-200/60 shrink-0 mt-0.5">
                     {getIcon(n.type)}
                   </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <h4 className={`text-xs truncate ${n.unread ? 'font-bold text-dark-text' : 'font-medium text-slate-700'}`}>
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-xs font-extrabold text-slate-900 truncate">
                         {n.title}
                       </h4>
-                      <span className="text-[10px] text-dark-faint shrink-0">{n.time}</span>
+                      <span className="text-[10px] font-semibold text-slate-400 shrink-0">{n.time}</span>
                     </div>
-                    <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-2 leading-relaxed">
-                      {n.description}
+                    <p className="text-[11px] text-slate-600 leading-snug line-clamp-2">
+                      {n.text}
                     </p>
-                    {n.actionType === 'chat' && (
-                      <div className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-brand-600 hover:underline">
-                        <MessageCircle className="w-3 h-3" />
-                        <span>View Chat Handshake →</span>
-                      </div>
-                    )}
                   </div>
-
-                  {n.unread && (
-                    <span className="w-2 h-2 rounded-full bg-brand-500 shrink-0 mt-1.5" />
-                  )}
                 </div>
               ))
             )}
-          </div>
-
-          {/* Bottom Footer */}
-          <div className="p-2.5 bg-slate-50 border-t border-border/70 text-center">
-            <span className="text-[10px] font-semibold text-dark-faint">
-              Protected by Connect2Go Trust & Safety Protocol
-            </span>
           </div>
 
         </div>
@@ -245,5 +180,3 @@ export function NotificationDropdown({ onOpenChat, onSelectTab, onOpenSettings }
     </div>
   );
 }
-
-export default NotificationDropdown;

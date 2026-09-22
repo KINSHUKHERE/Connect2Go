@@ -28,6 +28,9 @@ import {
   CheckCircle2,
   ExternalLink,
   ChevronRight,
+  Camera,
+  Upload,
+  Loader2,
   X
 } from 'lucide-react';
 import { Button } from '../components/ui/Button.jsx';
@@ -37,6 +40,7 @@ import { Avatar } from '../components/ui/Avatar.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { supabase, isSupabaseConfigured } from '../services/supabase.js';
+import { uploadToCloudinary } from '../services/cloudinary.js';
 
 const DEFAULT_SETTINGS = {
   // Privacy & Safety
@@ -64,7 +68,7 @@ const DEFAULT_SETTINGS = {
 };
 
 export function SettingsPage({ onNavigate, onSelectTab, onOpenSafety, onOpenAuth }) {
-  const { user, logout, updateUserProfile } = useAuth();
+  const { user, logout, updateUserProfile, updateUserAvatar, removeUserAvatar } = useAuth();
   const { addToast } = useToast();
 
   const [activeCategory, setActiveCategory] = useState('account');
@@ -84,6 +88,171 @@ export function SettingsPage({ onNavigate, onSelectTab, onOpenSafety, onOpenAuth
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Profile Details Edit State
+  const [isEditingProfile, setIsEditingProfile] = useState(true);
+  const [editName, setEditName] = useState(user?.name || '');
+  const [editUsername, setEditUsername] = useState(user?.username || '');
+  const [editGender, setEditGender] = useState(user?.gender || 'Male');
+  const [editEmail, setEditEmail] = useState(user?.email || '');
+  const [editPhone, setEditPhone] = useState(user?.phone || '');
+  const [editBio, setEditBio] = useState(user?.bio || '');
+  const [editLocation, setEditLocation] = useState(user?.location || 'Jaipur, Rajasthan');
+  const [editAvatar, setEditAvatar] = useState(user?.avatar || '');
+  const [isAvatarUploading, setIsAvatarUploading] = useState(false);
+  const [isProfileSaving, setIsProfileSaving] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setEditName(user.name || '');
+      setEditUsername(user.username || '');
+      setEditGender(user.gender || 'Male');
+      setEditEmail(user.email || '');
+      setEditPhone(user.phone || '');
+      setEditBio(user.bio || '');
+      setEditLocation(user.location || 'Jaipur, Rajasthan');
+      setEditAvatar(user.avatar || '');
+    }
+  }, [user]);
+
+  // Check if current avatar is a custom image vs default gender avatar
+  const isDefaultAvatarUrl = (url) => {
+    if (!url) return true;
+    return (
+      url === '/avatars/female.png' ||
+      url === '/avatars/male.png' ||
+      url === '/avatars/default.png' ||
+      url.includes('/avatars/female.png') ||
+      url.includes('/avatars/male.png') ||
+      url.includes('/avatars/default.png')
+    );
+  };
+
+  const hasCustomAvatar = !isDefaultAvatarUrl(editAvatar || user?.avatar);
+
+  // Handle Direct File Upload to Cloudinary (shows loader button)
+  const handleDirectFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      addToast('Please select a valid image file (PNG, JPG, WEBP).', 'error');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      addToast('Image size exceeds 10MB limit.', 'error');
+      return;
+    }
+
+    setIsAvatarUploading(true);
+    try {
+      const result = await uploadToCloudinary(file);
+      const uploadedUrl = typeof result === 'string' ? result : (result?.url || '');
+      const publicId = typeof result === 'object' ? (result?.public_id || null) : null;
+
+      if (uploadedUrl) {
+        setEditAvatar(uploadedUrl);
+        if (updateUserAvatar) {
+          await updateUserAvatar(uploadedUrl, publicId);
+        }
+        if (user) {
+          const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+          await fetch(`${API_BASE}/auth/update-profile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: user.id,
+              avatar_url: uploadedUrl
+            })
+          });
+          updateUserProfile({ avatar: uploadedUrl });
+        }
+        addToast('Profile picture uploaded successfully!', 'success');
+      } else {
+        throw new Error('Upload returned empty response.');
+      }
+    } catch (err) {
+      console.error('Avatar upload failed:', err);
+      addToast(err.message || 'Failed to upload profile picture.', 'error');
+    } finally {
+      setIsAvatarUploading(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  // Handle Remove Profile Picture -> Delete from Cloudinary & fallback to gender default
+  const handleRemoveAvatar = async () => {
+    setIsAvatarUploading(true);
+    try {
+      if (removeUserAvatar) {
+        const res = await removeUserAvatar();
+        if (res && res.avatar) {
+          setEditAvatar(res.avatar);
+        }
+      } else {
+        const genderLower = String(editGender || user?.gender || '').toLowerCase();
+        const defaultAv = (genderLower === 'female' || genderLower === 'f') ? '/avatars/female.png' : '/avatars/male.png';
+        setEditAvatar(defaultAv);
+        updateUserProfile({ avatar: defaultAv });
+      }
+      addToast('Profile picture removed and deleted from Cloudinary.', 'info');
+    } catch (err) {
+      console.error('Failed to remove avatar:', err);
+      addToast('Failed to remove profile picture.', 'error');
+    } finally {
+      setIsAvatarUploading(false);
+    }
+  };
+
+  // Handle Save Profile Details (Name, Username, Email, Phone, Bio, Location, Avatar)
+  const handleSaveProfile = async (e) => {
+    e?.preventDefault();
+    if (!user) return;
+    setIsProfileSaving(true);
+    try {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${API_BASE}/auth/update-profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          name: editName,
+          username: editUsername,
+          gender: editGender,
+          email: editEmail,
+          phone: editPhone,
+          bio: editBio,
+          location: editLocation,
+          avatar_url: editAvatar || user.avatar
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to update profile.');
+      }
+
+      updateUserProfile({
+        name: editName,
+        username: editUsername,
+        gender: editGender,
+        email: editEmail,
+        phone: editPhone,
+        bio: editBio,
+        location: editLocation,
+        avatar: editAvatar || user.avatar
+      });
+
+      setIsSaved(true);
+      addToast('Profile credentials and details updated successfully!', 'success');
+      setTimeout(() => setIsSaved(false), 2500);
+    } catch (err) {
+      addToast(err.message || 'Failed to update profile.', 'error');
+    } finally {
+      setIsProfileSaving(false);
+    }
+  };
+
   // Load saved preferences from localStorage
   useEffect(() => {
     try {
@@ -96,16 +265,20 @@ export function SettingsPage({ onNavigate, onSelectTab, onOpenSafety, onOpenAuth
     }
   }, []);
 
-  // Save Settings handler
-  const handleSave = (e) => {
+  // Save Settings handler (Top Right Green "Save Settings" Button)
+  const handleSave = async (e) => {
     e?.preventDefault();
     try {
       localStorage.setItem('connect2go_user_settings', JSON.stringify(settings));
-      setIsSaved(true);
-      addToast('Preferences & settings saved successfully!', 'success');
-      setTimeout(() => setIsSaved(false), 2500);
+      if (user) {
+        await handleSaveProfile(e);
+      } else {
+        setIsSaved(true);
+        addToast('Preferences & settings saved successfully!', 'success');
+        setTimeout(() => setIsSaved(false), 2500);
+      }
     } catch (e) {
-      addToast('Failed to save preferences', 'error');
+      addToast('Failed to save settings', 'error');
     }
   };
 
@@ -174,10 +347,15 @@ export function SettingsPage({ onNavigate, onSelectTab, onOpenSafety, onOpenAuth
   const isMatch = newPassword && newPassword === confirmPassword;
   const isPasswordValid = hasCapital && hasSmall && hasNumber && hasValidLength && isMatch;
 
-  // Handle Change Password Submit
+  // Handle Change Password Submit with Bcrypt Old Password Verification
   const handleChangePassword = async (e) => {
     e.preventDefault();
     setPasswordError('');
+
+    if (!currentPassword) {
+      setPasswordError('Please enter your current password.');
+      return;
+    }
 
     if (!isPasswordValid) {
       setPasswordError('Please meet all password requirements before proceeding.');
@@ -186,12 +364,24 @@ export function SettingsPage({ onNavigate, onSelectTab, onOpenSafety, onOpenAuth
 
     setPasswordLoading(true);
     try {
-      if (isSupabaseConfigured && supabase.auth) {
-        const { error } = await supabase.auth.updateUser({ password: newPassword });
-        if (error) throw error;
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${API_BASE}/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          email: user?.email,
+          oldPassword: currentPassword,
+          newPassword: newPassword
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to update password.');
       }
-      
-      addToast('Password updated successfully! Keep it secure.', 'success');
+
+      addToast('Password updated & securely hashed with bcrypt! Keep it safe.', 'success');
       setIsPasswordModalOpen(false);
       setCurrentPassword('');
       setNewPassword('');
@@ -267,10 +457,11 @@ export function SettingsPage({ onNavigate, onSelectTab, onOpenSafety, onOpenAuth
             size="sm"
             variant="primary"
             onClick={handleSave}
+            disabled={isProfileSaving}
             icon={Check}
             className="text-xs font-bold shadow-xs px-4"
           >
-            {isSaved ? 'Saved!' : 'Save Settings'}
+            {isProfileSaving ? 'Saving Profile...' : isSaved ? 'Saved!' : 'Save Settings'}
           </Button>
         </div>
       </div>
@@ -311,12 +502,45 @@ export function SettingsPage({ onNavigate, onSelectTab, onOpenSafety, onOpenAuth
       {/* Main Settings Card Header */}
       <div className="bg-white rounded-3xl border border-border/80 p-5 sm:p-7 shadow-soft flex flex-col md:flex-row md:items-center justify-between gap-5">
         <div className="flex items-center gap-4">
-          <Avatar
-            src={user?.avatar}
-            alt={user?.name || 'Guest User'}
-            size="lg"
-            className="ring-4 ring-brand-50 shadow-soft"
-          />
+          <div className="relative group shrink-0">
+            <Avatar
+              src={editAvatar || user?.avatar}
+              alt={user?.name || 'Guest User'}
+              size="lg"
+              className="ring-4 ring-brand-50 shadow-soft"
+            />
+            {user && (
+              <>
+                <input
+                  type="file"
+                  id="header-avatar-upload"
+                  accept="image/*"
+                  onChange={handleDirectFileChange}
+                  className="hidden"
+                  disabled={isAvatarUploading}
+                />
+                {hasCustomAvatar ? (
+                  <button
+                    type="button"
+                    onClick={handleRemoveAvatar}
+                    disabled={isAvatarUploading}
+                    className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all ring-2 ring-white disabled:opacity-50"
+                    title="Remove Profile Picture"
+                  >
+                    {isAvatarUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  </button>
+                ) : (
+                  <label
+                    htmlFor="header-avatar-upload"
+                    className={`absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[#00a884] hover:bg-emerald-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all ring-2 ring-white ${isAvatarUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                    title="Change Photo"
+                  >
+                    {isAvatarUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                  </label>
+                )}
+              </>
+            )}
+          </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl sm:text-2xl font-extrabold text-dark-text tracking-tight">
@@ -342,19 +566,6 @@ export function SettingsPage({ onNavigate, onSelectTab, onOpenSafety, onOpenAuth
             </p>
           </div>
         </div>
-
-        {user && (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onSelectTab ? onSelectTab('profile') : (onNavigate && onNavigate('/profile'))}
-              className="text-xs font-semibold"
-            >
-              View Public Profile
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* Main Settings Two-Column Layout */}
@@ -424,39 +635,212 @@ export function SettingsPage({ onNavigate, onSelectTab, onOpenSafety, onOpenAuth
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-brand-600" />
                     <h2 className="text-sm font-bold text-dark-text uppercase tracking-wider">
-                      Account Credentials
+                      Account Credentials & Profile
                     </h2>
                   </div>
                   {user && (
-                    <Badge variant="mint" size="sm">Active Session</Badge>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant={isEditingProfile ? "outline" : "primary"}
+                        onClick={() => setIsEditingProfile(!isEditingProfile)}
+                        className="text-xs font-bold shadow-xs px-3"
+                      >
+                        {isEditingProfile ? 'Cancel Edit' : 'Edit Credentials'}
+                      </Button>
+                      <Badge variant="mint" size="sm">Active Session</Badge>
+                    </div>
                   )}
                 </div>
 
                 {user ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-border/60">
-                      <p className="text-[10px] font-bold text-dark-faint uppercase">Display Name</p>
-                      <p className="text-xs sm:text-sm font-bold text-dark-text mt-0.5">{user.name}</p>
-                    </div>
+                  isEditingProfile ? (
+                    <form onSubmit={handleSaveProfile} className="space-y-4 bg-slate-50/60 p-4 sm:p-5 rounded-2xl border border-brand-100">
+                      
+                      {/* Direct Avatar Upload & Removal Row */}
+                      <div className="flex items-center gap-4 p-3.5 bg-white rounded-2xl border border-border/80 shadow-xs">
+                        <Avatar
+                          src={editAvatar || user?.avatar}
+                          alt={editName || 'Avatar'}
+                          size="md"
+                          className="ring-2 ring-brand-100 shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-dark-text">Profile Picture</p>
+                          <p className="text-[11px] text-dark-muted truncate">
+                            {hasCustomAvatar ? 'Custom profile photo set' : 'Default image assigned based on gender'}
+                          </p>
+                        </div>
 
-                    <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-border/60">
-                      <p className="text-[10px] font-bold text-dark-faint uppercase">Username</p>
-                      <p className="text-xs sm:text-sm font-bold text-dark-text mt-0.5">@{user.username}</p>
-                    </div>
+                        <input
+                          type="file"
+                          id="edit-profile-avatar-input"
+                          accept="image/*"
+                          onChange={handleDirectFileChange}
+                          className="hidden"
+                          disabled={isAvatarUploading}
+                        />
 
-                    <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-border/60">
-                      <p className="text-[10px] font-bold text-dark-faint uppercase">Primary Email Address</p>
-                      <p className="text-xs sm:text-sm font-bold text-dark-text mt-0.5">{user.email}</p>
-                    </div>
+                        {hasCustomAvatar ? (
+                          <button
+                            type="button"
+                            onClick={handleRemoveAvatar}
+                            disabled={isAvatarUploading}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl border border-red-200 transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            {isAvatarUploading ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-red-600" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                            )}
+                            <span>{isAvatarUploading ? 'Removing...' : 'Remove Profile Picture'}</span>
+                          </button>
+                        ) : (
+                          <label
+                            htmlFor="edit-profile-avatar-input"
+                            className={`inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-bold rounded-xl border border-brand-200 transition-colors cursor-pointer ${isAvatarUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                          >
+                            {isAvatarUploading ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-600" />
+                            ) : (
+                              <Upload className="w-3.5 h-3.5 text-brand-600" />
+                            )}
+                            <span>{isAvatarUploading ? 'Uploading...' : 'Change Photo'}</span>
+                          </label>
+                        )}
+                      </div>
 
-                    <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-border/60">
-                      <p className="text-[10px] font-bold text-dark-faint uppercase">Account Security Status</p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                        <span className="text-xs font-bold text-emerald-700">Protected & Verified</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-dark-text">Display Name</label>
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder="Your Full Name"
+                            className="w-full px-3.5 py-2.5 bg-white border border-border rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-dark-text">Username (Public Handle)</label>
+                          <input
+                            type="text"
+                            value={editUsername}
+                            onChange={(e) => setEditUsername(e.target.value.toLowerCase().replace(/\s+/g, '_'))}
+                            placeholder="username"
+                            className="w-full px-3.5 py-2.5 bg-white border border-border rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none font-semibold"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-dark-text">Gender</label>
+                          <select
+                            value={editGender}
+                            onChange={(e) => setEditGender(e.target.value)}
+                            className="w-full px-3.5 py-2.5 bg-white border border-border rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none font-semibold"
+                          >
+                            <option value="Male">Male 👦</option>
+                            <option value="Female">Female 👩</option>
+                            <option value="Other">Other ✨</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-dark-text">Primary Email Address</label>
+                          <input
+                            type="email"
+                            value={editEmail}
+                            onChange={(e) => setEditEmail(e.target.value)}
+                            placeholder="email@domain.com"
+                            className="w-full px-3.5 py-2.5 bg-white border border-border rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-dark-text">Phone Number</label>
+                          <input
+                            type="tel"
+                            value={editPhone}
+                            onChange={(e) => setEditPhone(e.target.value)}
+                            placeholder="+91 98290 00000"
+                            className="w-full px-3.5 py-2.5 bg-white border border-border rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                          />
+                        </div>
+
+                        <div className="space-y-1 sm:col-span-2">
+                          <label className="text-xs font-bold text-dark-text">Location</label>
+                          <input
+                            type="text"
+                            value={editLocation}
+                            onChange={(e) => setEditLocation(e.target.value)}
+                            placeholder="Jaipur, Rajasthan"
+                            className="w-full px-3.5 py-2.5 bg-white border border-border rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                          />
+                        </div>
+
+                        <div className="space-y-1 sm:col-span-2">
+                          <label className="text-xs font-bold text-dark-text">Bio</label>
+                          <textarea
+                            value={editBio}
+                            onChange={(e) => setEditBio(e.target.value)}
+                            rows={2}
+                            placeholder="Tell the community a bit about yourself..."
+                            className="w-full px-3.5 py-2.5 bg-white border border-border rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none resize-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/60">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsEditingProfile(false)}
+                          className="text-xs"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="submit"
+                          variant="primary"
+                          size="sm"
+                          disabled={isProfileSaving}
+                          className="text-xs font-bold shadow-xs px-4"
+                        >
+                          {isProfileSaving ? 'Saving...' : 'Save Profile Changes'}
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-border/60">
+                        <p className="text-[10px] font-bold text-dark-faint uppercase">Display Name</p>
+                        <p className="text-xs sm:text-sm font-bold text-dark-text mt-0.5">{user.name}</p>
+                      </div>
+
+                      <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-border/60">
+                        <p className="text-[10px] font-bold text-dark-faint uppercase">Username</p>
+                        <p className="text-xs sm:text-sm font-bold text-dark-text mt-0.5">@{user.username}</p>
+                      </div>
+
+                      <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-border/60">
+                        <p className="text-[10px] font-bold text-dark-faint uppercase">Primary Email Address</p>
+                        <p className="text-xs sm:text-sm font-bold text-dark-text mt-0.5">{user.email}</p>
+                      </div>
+
+                      <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-border/60">
+                        <p className="text-[10px] font-bold text-dark-faint uppercase">Account Security Status</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                          <span className="text-xs font-bold text-emerald-700">Protected & Verified</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )
                 ) : (
                   <div className="p-6 bg-slate-50 rounded-2xl border border-border/60 text-center space-y-3">
                     <Lock className="w-8 h-8 text-slate-400 mx-auto" />

@@ -375,35 +375,66 @@ export function DashboardPage({ onOpenCreate, onJoinActivity, onOpenLocationPick
 
         {user ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
-            {people.map((p) => {
-              const avatar = getSafeAvatar(p.name, p.avatar);
+            {people
+              .filter(p => 
+                !user || (
+                  p.id !== user.id && 
+                  (p.email || '').toLowerCase() !== (user.email || '').toLowerCase() &&
+                  (p.username || '').toLowerCase() !== (user.username || '').toLowerCase() &&
+                  (p.name || '').toLowerCase() !== (user.name || '').toLowerCase()
+                )
+              )
+              .map((p) => {
+              const avatar = getSafeAvatar(p.name, p.avatar, p.gender);
+
+              // Calculate dynamic common hobbies between active user & peer
+              const userInterests = Array.isArray(user?.interests) && user.interests.length > 0 
+                ? user.interests 
+                : ['Badminton', 'Study', 'Fitness'];
+              const peerInterests = Array.isArray(p.interests) && p.interests.length > 0 
+                ? p.interests 
+                : ['Badminton', 'Fitness', 'Running'];
+
+              const sharedInterests = peerInterests.filter(item => 
+                userInterests.some(u => u.toLowerCase() === item.toLowerCase())
+              );
+              const sharedCount = sharedInterests.length > 0 ? sharedInterests.length : 1;
+              const sharedListText = sharedInterests.length > 0 
+                ? sharedInterests.join(', ') 
+                : (peerInterests[0] || 'Badminton');
 
               return (
                 <div
                   key={p.id}
-                  className="bg-white p-3.5 rounded-2xl border border-border/80 shadow-soft hover:shadow-soft-hover transition-all text-center space-y-2 group"
+                  className="bg-white p-3.5 rounded-2xl border border-border/80 shadow-soft hover:shadow-soft-hover transition-all text-center space-y-2 group flex flex-col justify-between"
                 >
-                  <div className="relative inline-block mx-auto">
-                    <img
-                      src={avatar}
-                      alt={p.name}
-                      onError={(e) => handleAvatarError(e, p.name)}
-                      className="w-14 h-14 rounded-full object-cover mx-auto ring-2 ring-brand-100 bg-slate-100 group-hover:scale-105 transition-transform"
-                    />
-                    <span className="absolute bottom-0 right-1 w-3 h-3 rounded-full bg-brand-500 ring-2 ring-white" />
-                  </div>
+                  <div className="space-y-2">
+                    <div className="relative inline-block mx-auto">
+                      <img
+                        src={avatar}
+                        alt={p.username || p.name}
+                        onError={(e) => handleAvatarError(e, p.name, p.gender)}
+                        className="w-14 h-14 rounded-full object-cover mx-auto ring-2 ring-brand-100 bg-slate-100 group-hover:scale-105 transition-transform"
+                      />
+                      <span className="absolute bottom-0 right-1 w-3 h-3 rounded-full bg-brand-500 ring-2 ring-white" title="Online Member" />
+                    </div>
 
-                  <div>
-                    <h4 className="text-xs font-bold text-dark-text truncate">{p.name}</h4>
-                    <p className="text-[11px] text-brand-600 font-semibold">{p.distanceKm} km away</p>
-                    <p className="text-[10px] text-dark-faint mt-0.5">{p.commonInterests} shared interests</p>
+                    <div>
+                      <h4 className="text-xs font-extrabold text-dark-text truncate" title={`@${p.username || p.name}`}>
+                        @{p.username || (p.name || 'user').toLowerCase().replace(/\s+/g, '_')}
+                      </h4>
+                      <p className="text-[11px] text-brand-600 font-semibold">{p.distanceKm} km away</p>
+                      <div className="mt-1 bg-emerald-50 text-emerald-800 text-[10px] font-bold py-0.5 px-1.5 rounded-md border border-emerald-200/60 truncate" title={`Shared: ${sharedListText}`}>
+                        <span>✨ {sharedCount} shared ({sharedListText})</span>
+                      </div>
+                    </div>
                   </div>
 
                   <Button
                     size="sm"
                     variant="secondary"
-                    className="w-full text-[11px] h-7 font-bold"
-                    onClick={() => onJoinActivity({ title: `Chat with ${p.name}`, creator: p })}
+                    className="w-full text-[11px] h-7 font-bold mt-2"
+                    onClick={() => onJoinActivity({ title: `Chat with @${p.username || p.name}`, creator: p })}
                   >
                     Chat
                   </Button>

@@ -13,14 +13,16 @@ export function MatchesPage({ onJoinChat, onOpenReport, onComingSoon }) {
   const [sortBy, setSortBy] = useState('match'); // 'match' | 'distance'
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Pre-calculate compatibility for each peer
-  const scoredPeople = people.map((p) => {
-    const comp = calculateCompatibility(user, p, 'peer');
-    return {
-      ...p,
-      compatibility: comp,
-    };
-  }).sort((a, b) => {
+  // Pre-calculate compatibility for each peer (excluding logged-in user)
+  const scoredPeople = people
+    .filter(p => !user || (p.id !== user.id && p.username !== user.username && p.name !== user.name))
+    .map((p) => {
+      const comp = calculateCompatibility(user, p, 'peer');
+      return {
+        ...p,
+        compatibility: comp,
+      };
+    }).sort((a, b) => {
     if (sortBy === 'match') {
       return b.compatibility.score - a.compatibility.score;
     }
@@ -151,7 +153,6 @@ export function MatchesPage({ onJoinChat, onOpenReport, onComingSoon }) {
       {filteredPeople.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredPeople.map((p) => {
-            const avatar = getSafeAvatar(p.name, p.avatar);
             const { score, label, highlight, breakdown } = p.compatibility;
 
             // Determine badge color tone based on score
@@ -161,10 +162,13 @@ export function MatchesPage({ onJoinChat, onOpenReport, onComingSoon }) {
               ? 'bg-brand-50 text-brand-700 border-brand-200' 
               : 'bg-slate-100 text-slate-700 border-slate-200';
 
+            const avatar = getSafeAvatar(p.name, p.avatar, p.gender);
+            const handle = p.username || (p.name || 'user').toLowerCase().replace(/\s+/g, '_');
+
             return (
               <div
                 key={p.id}
-                className="bg-white rounded-2xl border border-border/80 p-5 shadow-soft hover:shadow-soft-hover transition-all flex flex-col justify-between space-y-4 relative group"
+                className="bg-white rounded-3xl border border-border/80 p-5 shadow-soft hover:shadow-soft-hover transition-all space-y-4 text-left"
               >
                 <div>
                   <div className="flex items-start justify-between gap-3">
@@ -172,13 +176,14 @@ export function MatchesPage({ onJoinChat, onOpenReport, onComingSoon }) {
                       <div className="relative">
                         <img
                           src={avatar}
-                          alt={p.name}
-                          className="w-12 h-12 rounded-full object-cover ring-2 ring-brand-100 bg-slate-100"
+                          alt={handle}
+                          onError={(e) => handleAvatarError(e, p.name, p.gender)}
+                          className="w-13 h-13 rounded-2xl object-cover ring-2 ring-brand-100 bg-slate-100 shadow-2xs"
                         />
                         <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-brand-500 ring-2 ring-white" />
                       </div>
                       <div>
-                        <h3 className="text-base font-bold text-dark-text leading-tight">{p.name}</h3>
+                        <h3 className="text-base font-extrabold text-dark-text leading-tight">@{handle}</h3>
                         <p className="text-xs text-brand-600 font-semibold flex items-center gap-1 mt-0.5">
                           <MapPin className="w-3.5 h-3.5" />
                           {p.distanceKm} km away
@@ -235,10 +240,17 @@ export function MatchesPage({ onJoinChat, onOpenReport, onComingSoon }) {
                     variant="primary"
                     onClick={() => onJoinChat({ title: `Chat with ${p.name}`, creator: p })}
                     icon={MessageCircle}
-                    className="w-full text-xs font-bold h-9"
+                    className="flex-1 text-xs font-bold h-9"
                   >
                     Chat Anonymously
                   </Button>
+                  <button
+                    onClick={() => onOpenReport ? onOpenReport(p.name) : null}
+                    className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl border border-slate-200/70 hover:border-amber-200 transition-colors"
+                    title={`Report ${p.name} for safety violation`}
+                  >
+                    <ShieldAlert className="w-4 h-4" />
+                  </button>
                 </div>
 
               </div>
@@ -252,18 +264,24 @@ export function MatchesPage({ onJoinChat, onOpenReport, onComingSoon }) {
             🔍
           </div>
           <div className="max-w-md mx-auto space-y-1">
-            <h4 className="text-base font-bold text-dark-text">No matched peers found</h4>
+            <h4 className="text-base font-bold text-dark-text">
+              {searchQuery ? 'No matched peers found' : 'No other members nearby yet'}
+            </h4>
             <p className="text-xs text-dark-muted">
-              We couldn't find anyone matching "{searchQuery}". Try searching for another name or hobby like "Badminton", "Running", or "Fitness".
+              {searchQuery 
+                ? `We couldn't find anyone matching "${searchQuery}". Try searching for another name or hobby like "Badminton", "Running", or "Fitness".`
+                : 'You are currently the only registered member in this area. As soon as another member signs up or hosts an activity, they will appear here scored by compatibility!'}
             </p>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => setSearchQuery('')}
-            className="font-bold text-xs"
-          >
-            Clear Search
-          </Button>
+          {searchQuery && (
+            <Button
+              variant="outline"
+              onClick={() => setSearchQuery('')}
+              className="font-bold text-xs"
+            >
+              Clear Search
+            </Button>
+          )}
         </div>
       )}
 

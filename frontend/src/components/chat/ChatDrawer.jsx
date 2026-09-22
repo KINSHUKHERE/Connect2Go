@@ -3,6 +3,7 @@ import {
   X, 
   Shield, 
   ShieldCheck, 
+  ShieldAlert,
   Send, 
   Sparkles, 
   CheckCheck, 
@@ -16,50 +17,49 @@ import {
   AlertCircle
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { useChat } from '../../context/ChatContext.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Badge } from '../ui/Badge.jsx';
 import { getSafeAvatar } from '../../utils/imageUtils.js';
 
-export function ChatDrawer({ isOpen, onClose, peer, peerName = 'Rohan', onComingSoon }) {
+export function ChatDrawer({ isOpen, onClose, peer, peerName = 'Partner', onComingSoon, onOpenReport }) {
+  const { 
+    activeConversation, 
+    sendMessage, 
+    openOrCreateConversationWithPeer, 
+    sendTypingNotification, 
+    partnerTyping 
+  } = useChat();
+
   // Resolve peer info whether passed as object or string
   const resolvedPeer = typeof peer === 'object' && peer !== null ? peer : { name: peerName };
-  const realName = resolvedPeer.name || peerName || 'Rohan Sharma';
-  const realAvatar = getSafeAvatar(realName, resolvedPeer.avatar || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&auto=format&fit=crop&q=80');
+  const realName = resolvedPeer.name || peerName || 'Partner';
+  const realAvatar = getSafeAvatar(realName, resolvedPeer.avatar || '');
   const anonymousAlias = `ActivePeer #${Math.abs(realName.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 900 + 100)}`;
 
   // Handshake State: 'masked' | 'requested_by_me' | 'requested_by_peer' | 'revealed'
   const [handshakeState, setHandshakeState] = useState('masked');
   const [showProfileCard, setShowProfileCard] = useState(false);
-  
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      sender: 'peer',
-      text: 'Hey! Are you interested in participating in this activity together?',
-      time: '5:20 PM'
-    },
-    {
-      id: 2,
-      sender: 'me',
-      text: 'Yes! That sounds great. I am free around the scheduled time.',
-      time: '5:21 PM'
-    },
-    {
-      id: 3,
-      sender: 'peer',
-      text: 'Awesome! We can coordinate everything here anonymously before meeting.',
-      time: '5:22 PM'
-    }
-  ]);
+  const [currentConvId, setCurrentConvId] = useState(null);
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen && peer) {
+      openOrCreateConversationWithPeer(resolvedPeer).then((id) => {
+        if (id) setCurrentConvId(id);
+      });
+    }
+  }, [isOpen, peer]);
+
+  const activeMessages = activeConversation?.messages || [];
 
   // Auto-scroll to bottom of chat
   useEffect(() => {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, isOpen, handshakeState]);
+  }, [activeMessages, isOpen, handshakeState]);
 
   if (!isOpen) return null;
 
@@ -67,15 +67,10 @@ export function ChatDrawer({ isOpen, onClose, peer, peerName = 'Rohan', onComing
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        sender: 'me',
-        text: inputText,
-        time: 'Just now'
-      }
-    ]);
+    const targetId = currentConvId || activeConversation?.id;
+    if (targetId) {
+      sendMessage(targetId, inputText);
+    }
     setInputText('');
   };
 
@@ -197,12 +192,22 @@ export function ChatDrawer({ isOpen, onClose, peer, peerName = 'Rohan', onComing
               </div>
             </div>
 
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-dark-muted hover:text-dark-text hover:bg-slate-200/60 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => onOpenReport ? onOpenReport(realName) : null}
+                className="p-1.5 rounded-full text-amber-600 hover:text-amber-700 hover:bg-amber-50 transition-colors"
+                title={`Report ${realName} for safety violation`}
+              >
+                <ShieldAlert className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={onClose}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-dark-muted hover:text-dark-text hover:bg-slate-200/60 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Handshake Protocol Banner */}
@@ -343,7 +348,20 @@ export function ChatDrawer({ isOpen, onClose, peer, peerName = 'Rohan', onComing
               </span>
             </div>
 
-            {messages.map((m) => {
+            {activeMessages.length === 0 ? (
+              <div className="py-16 text-center text-dark-muted space-y-2.5">
+                <div className="w-12 h-12 rounded-2xl bg-brand-50 border border-brand-200 text-brand-600 flex items-center justify-center mx-auto shadow-2xs">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-xs font-bold text-dark-text">Start the conversation</p>
+                  <p className="text-[11px] text-dark-faint max-w-xs mx-auto">
+                    Type a message below to coordinate plans and meet up safely.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              activeMessages.map((m) => {
               if (m.type === 'milestone') {
                 return (
                   <div key={m.id} className="my-3 p-3 bg-emerald-100/70 border border-emerald-300 rounded-2xl text-center space-y-1 shadow-xs">
@@ -384,7 +402,14 @@ export function ChatDrawer({ isOpen, onClose, peer, peerName = 'Rohan', onComing
                   </span>
                 </div>
               );
-            })}
+            }))}
+
+            {partnerTyping && (
+              <div className="px-3 py-1.5 bg-emerald-50 text-[11px] text-emerald-800 font-bold flex items-center gap-2 border border-emerald-200 rounded-xl animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                <span>{partnerTyping} is typing...</span>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -394,7 +419,13 @@ export function ChatDrawer({ isOpen, onClose, peer, peerName = 'Rohan', onComing
               type="text"
               placeholder={isRevealed ? "Type a message..." : "Type a safe anonymous message..."}
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setInputText(val);
+                if (currentConvId || activeConversation?.id) {
+                  sendTypingNotification(currentConvId || activeConversation?.id, val.length > 0);
+                }
+              }}
               className="flex-1 h-11 px-4 text-xs bg-slate-50 border border-border rounded-full focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             />
             <button

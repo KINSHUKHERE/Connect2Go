@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Compass, Plus, MessageCircle, User } from 'lucide-react';
+import { Home, Compass, Plus, MessageCircle, Settings } from 'lucide-react';
 
 export function BottomNavigation({ currentTab, setCurrentTab, onOpenCreate, onOpenChat }) {
   return (
@@ -45,13 +45,13 @@ export function BottomNavigation({ currentTab, setCurrentTab, onOpenCreate, onOp
       </button>
 
       <button
-        onClick={() => setCurrentTab('profile')}
+        onClick={() => setCurrentTab('settings')}
         className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg transition-colors ${
-          currentTab === 'profile' ? 'text-brand-600 font-bold' : 'text-dark-muted'
+          currentTab === 'settings' ? 'text-brand-600 font-bold' : 'text-dark-muted'
         }`}
       >
-        <User className="w-5 h-5" />
-        <span className="text-[11px] font-medium">Profile</span>
+        <Settings className="w-5 h-5" />
+        <span className="text-[11px] font-medium">Settings</span>
       </button>
     </nav>
   );

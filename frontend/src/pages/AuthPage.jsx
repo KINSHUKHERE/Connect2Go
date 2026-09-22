@@ -17,12 +17,15 @@ import {
   Gamepad2,
   BookOpen,
   Compass,
-  Activity
+  Activity,
+  Camera,
+  Upload
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { checkPasswordPolicy } from '../utils/authUtils.js';
+import { DEFAULT_UNKNOWN_AVATAR } from '../utils/imageUtils.js';
 
 export function AuthPage({ mode = 'signin', onNavigate }) {
   const { 
@@ -37,6 +40,8 @@ export function AuthPage({ mode = 'signin', onNavigate }) {
 
   const [authMode, setAuthMode] = useState(mode === 'signup' ? 'signup' : 'signin');
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [gender, setGender] = useState('Male');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -45,6 +50,27 @@ export function AuthPage({ mode = 'signin', onNavigate }) {
   const [rememberMe, setRememberMe] = useState(true);
   const [agreeTerms, setAgreeTerms] = useState(true);
   const [localError, setLocalError] = useState(null);
+
+  // Optional Avatar Upload state
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState('/avatars/male.png');
+  const fileInputRef = React.useRef(null);
+
+  const handleAvatarFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Image size must be smaller than 5MB.');
+        return;
+      }
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Sync mode when prop changes
   useEffect(() => {
@@ -87,8 +113,15 @@ export function AuthPage({ mode = 'signin', onNavigate }) {
 
     if (authMode === 'signup') {
       const trimmedName = name.trim();
+      const trimmedUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+
       if (!trimmedName) {
         setLocalError('Please enter your full name.');
+        return;
+      }
+
+      if (!trimmedUsername) {
+        setLocalError('Please choose a username (e.g. alex_ninja99) for public anonymity.');
         return;
       }
 
@@ -119,9 +152,11 @@ export function AuthPage({ mode = 'signin', onNavigate }) {
         return;
       }
 
-      const res = await signUpWithEmail(trimmedEmail, trimmedPassword, trimmedName);
+      const defaultAvatarForGender = gender.toLowerCase() === 'female' ? '/avatars/female.png' : '/avatars/male.png';
+      const finalAvatar = avatarPreview || defaultAvatarForGender;
+      const res = await signUpWithEmail(trimmedEmail, trimmedPassword, trimmedName, trimmedUsername, gender, finalAvatar);
       if (res?.success) {
-        toast.success(`Welcome to Connect2Go, ${trimmedName.split(' ')[0]}!`);
+        toast.success(`Welcome to Connect2Go, @${trimmedUsername}!`);
         if (onNavigate) onNavigate('home');
       }
     } else {
@@ -453,6 +488,70 @@ export function AuthPage({ mode = 'signin', onNavigate }) {
 
             {/* Main Form */}
             <form onSubmit={handleSubmit} className="space-y-2.5">
+
+              {/* Profile Photo Upload (Optional - Sign Up Only) */}
+              {authMode === 'signup' && (
+                <div className="space-y-1 animate-in fade-in duration-150">
+                  <label className="block text-[11px] font-bold text-slate-700">
+                    Profile Photo <span className="text-[10px] font-normal text-slate-400">(Optional)</span>
+                  </label>
+                  <div className="flex items-center gap-3 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/80">
+                    <div className="relative shrink-0">
+                      <img
+                        src={avatarPreview || DEFAULT_UNKNOWN_AVATAR}
+                        alt="Avatar Preview"
+                        className="w-11 h-11 rounded-xl object-cover ring-2 ring-emerald-500/30 bg-slate-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-xs hover:bg-emerald-600 transition-colors cursor-pointer"
+                        title="Choose photo"
+                      >
+                        <Camera className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="text-[11px] font-bold text-slate-800 truncate">
+                        {avatarFile ? avatarFile.name : 'Default Avatar'}
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        {avatarFile ? 'Custom photo selected' : 'Upload photo or keep default icon'}
+                      </p>
+                      <div className="flex items-center gap-2.5 mt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+                        >
+                          {avatarPreview ? 'Change Photo' : '+ Choose Photo'}
+                        </button>
+                        {avatarPreview && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAvatarFile(null);
+                              setAvatarPreview(null);
+                            }}
+                            className="text-[10px] font-bold text-red-500 hover:underline cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*"
+                      onChange={handleAvatarFileSelect}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+              )}
               
               {/* Full Name (Sign Up Only) */}
               {authMode === 'signup' && (
@@ -472,6 +571,87 @@ export function AuthPage({ mode = 'signin', onNavigate }) {
                     />
                   </div>
                 </div>
+              )}
+
+              {/* Username & Gender Fields (Sign Up Only) */}
+              {authMode === 'signup' && (
+                <>
+                  {/* Username Field */}
+                  <div className="space-y-0.5 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[11px] font-bold text-slate-700">
+                        Username <span className="text-[10px] font-normal text-emerald-600">(Public Identity)</span>
+                      </label>
+                    </div>
+                    <div className="relative flex items-center">
+                      <span className="absolute left-3 text-slate-400 font-bold text-xs pointer-events-none">@</span>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. prachi_jain99"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                        className="w-full h-10 pl-8 pr-3 bg-slate-50/70 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#22C55E] focus:bg-white focus:ring-2 focus:ring-[#22C55E]/20 transition-all font-semibold"
+                      />
+                    </div>
+                    <p className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg flex items-center gap-1 border border-emerald-200/60 mt-1">
+                      <span>🔒 Only your username will be visible to others for complete anonymity.</span>
+                    </p>
+                  </div>
+
+                  {/* Gender Selector */}
+                  <div className="space-y-1 animate-in fade-in duration-150">
+                    <label className="block text-[11px] font-bold text-slate-700">
+                      Gender <span className="text-[10px] font-normal text-slate-400">(Determines default avatar icon)</span>
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGender('Male');
+                          if (!avatarFile) setAvatarPreview('/avatars/male.png');
+                        }}
+                        className={`h-9 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                          gender === 'Male'
+                            ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>👦 Male</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGender('Female');
+                          if (!avatarFile) setAvatarPreview('/avatars/female.png');
+                        }}
+                        className={`h-9 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                          gender === 'Female'
+                            ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>👩 Female</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGender('Other');
+                          if (!avatarFile) setAvatarPreview('/avatars/male.png');
+                        }}
+                        className={`h-9 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                          gender === 'Other'
+                            ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>✨ Other</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
               )}
 
               {/* Email Address */}
@@ -532,59 +712,12 @@ export function AuthPage({ mode = 'signin', onNavigate }) {
                   </button>
                 </div>
 
-                {/* Password Policy Tracker (Sign Up Only) */}
-                {authMode === 'signup' && (
-                  <div className="space-y-1.5 pt-0.5">
-                    <div className="grid grid-cols-2 gap-1">
-                      {passwordPolicy.rules.map((rule) => {
-                        const isMet = rule.valid;
-                        return (
-                          <div
-                            key={rule.id}
-                            className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all ${
-                              isMet 
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                                : password.length > 0 
-                                  ? 'bg-amber-50/80 text-amber-800 border border-amber-200/80' 
-                                  : 'bg-slate-100/80 text-slate-500 border border-slate-200/60'
-                            }`}
-                          >
-                            {isMet ? (
-                              <Check className="w-3 h-3 text-[#22C55E] shrink-0 stroke-[2.5]" />
-                            ) : (
-                              <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
-                            )}
-                            <span className="truncate">{rule.label}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Pending alert box if requirements are not yet complete */}
-                    {password.length > 0 && !passwordPolicy.isSatisfied && (
-                      <div className="p-2 bg-amber-50/90 border border-amber-200/90 rounded-xl space-y-0.5 animate-in fade-in duration-150">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-amber-900">
-                          <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
-                          <span>Pending ({passwordPolicy.pendingRules.length} left):</span>
-                        </div>
-                        <ul className="text-[10px] text-amber-800 pl-4 list-disc font-medium leading-tight">
-                          {passwordPolicy.pendingRules.map((rule) => (
-                            <li key={rule.id}>
-                              <span className="font-semibold text-amber-950">{rule.pendingMessage}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Satisfied confirmation banner */}
-                    {password.length > 0 && passwordPolicy.isSatisfied && (
-                      <div className="p-1.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 animate-in fade-in duration-150">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-[#22C55E] shrink-0" />
-                        <span>✓ Password fulfills all security criteria!</span>
-                      </div>
-                    )}
-                  </div>
+                {/* Password Error Reminder (Only shown while typing invalid password) */}
+                {authMode === 'signup' && password.length > 0 && !passwordPolicy.isSatisfied && (
+                  <p className="text-[11px] font-semibold text-amber-600 flex items-center gap-1.5 mt-1 animate-in fade-in duration-150">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                    <span>Must be 8-16 chars, contain 1 uppercase (A-Z), 1 lowercase (a-z), & 1 number.</span>
+                  </p>
                 )}
               </div>
 
@@ -595,23 +728,6 @@ export function AuthPage({ mode = 'signin', onNavigate }) {
                     <label className="block text-[11px] font-bold text-slate-700">
                       Confirm Password
                     </label>
-                    {confirmPassword.length > 0 && (
-                      <span className={`text-[10px] font-bold flex items-center gap-1 ${
-                        passwordsMatch ? 'text-emerald-600' : 'text-red-600'
-                      }`}>
-                        {passwordsMatch ? (
-                          <>
-                            <Check className="w-3 h-3 text-[#22C55E]" />
-                            <span>Passwords match</span>
-                          </>
-                        ) : (
-                          <>
-                            <AlertCircle className="w-3 h-3 text-red-500" />
-                            <span>Not matching</span>
-                          </>
-                        )}
-                      </span>
-                    )}
                   </div>
 
                   <div className="relative flex items-center">

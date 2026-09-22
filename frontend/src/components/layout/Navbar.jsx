@@ -139,6 +139,19 @@ export function Navbar({
 
         {/* Right Actions */}
         <div className="flex items-center gap-2.5">
+          {/* Admin Console Quick Link */}
+          {Boolean(user?.isAdmin || user?.role === 'admin' || user?.email === 'herekinshuk@gmail.com') && (
+            <button
+              onClick={() => onNavigate('/admin')}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-800 border border-brand-200 rounded-full text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+              title="Switch to Admin Operations Console"
+            >
+              <Shield className="w-3.5 h-3.5 text-brand-600" />
+              <span className="hidden md:inline">Admin Console</span>
+              <span className="text-[9px] bg-brand-200 text-brand-900 px-1 py-0.2 rounded font-black">ADMIN</span>
+            </button>
+          )}
+
           {/* Host Activity CTA Button */}
           <Button
             size="sm"
@@ -222,25 +235,22 @@ export function Navbar({
                 <div className="bg-white rounded-2xl shadow-xl border border-border/90 p-1.5 space-y-1 text-left">
                   {user ? (
                     <>
-                      {/* User Info Header with quick profile click */}
+                      {/* User Info Header with quick profile & settings click */}
                       <div 
                         onClick={() => {
                           setProfileDropdownOpen(false);
-                          handleSelectTab('profile');
+                          handleSelectTab('settings');
                         }}
                         className="px-3 py-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-100 flex items-center gap-2.5 cursor-pointer transition-colors group"
-                        title="View profile & change photo"
+                        title="Settings & Profile Credentials"
                       >
                         <div className="relative">
                           <img
-                            src={getSafeAvatar(user.name, user.avatar)}
+                            src={getSafeAvatar(user.name, user.avatar, user.gender)}
                             alt={user.name}
-                            onError={(e) => handleAvatarError(e, user.name)}
+                            onError={(e) => handleAvatarError(e, user.name, user.gender)}
                             className="w-8 h-8 rounded-full object-cover ring-2 ring-brand-500/30 shrink-0"
                           />
-                          <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-brand-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs">
-                            <Camera className="w-2 h-2" />
-                          </span>
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-bold text-dark-text truncate">{user.name}</p>
@@ -250,18 +260,24 @@ export function Navbar({
 
                       <div className="h-px bg-border/60 my-1"></div>
 
-                      {/* Dropdown Navigation Links */}
-                      <button
-                        onClick={() => handleSelectTab('profile')}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                          activeTab === 'profile'
-                            ? 'bg-brand-50 text-brand-700 font-bold'
-                            : 'text-dark-text hover:bg-slate-50'
-                        }`}
-                      >
-                        <User className="w-4 h-4 text-brand-600" />
-                        <span>My Profile</span>
-                      </button>
+                      {/* Admin Console Switcher for Super Admin */}
+                      {Boolean(user?.isAdmin || user?.role === 'admin' || user?.email === 'herekinshuk@gmail.com') && (
+                        <button
+                          onClick={() => {
+                            setProfileDropdownOpen(false);
+                            onNavigate('/admin');
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-brand-800 bg-brand-50 hover:bg-brand-100 transition-colors border border-brand-200/80 mb-1 cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Shield className="w-4 h-4 text-brand-600" />
+                            <span>Admin Console</span>
+                          </div>
+                          <span className="text-[9px] bg-brand-200 text-brand-900 px-1.5 py-0.5 rounded font-black">
+                            SUPER ADMIN
+                          </span>
+                        </button>
+                      )}
 
                       <button
                         onClick={() => handleSelectTab('safety')}
@@ -314,17 +330,17 @@ export function Navbar({
                       <div 
                         onClick={() => {
                           setProfileDropdownOpen(false);
-                          handleSelectTab('profile');
+                          handleSelectTab('settings');
                         }}
                         className="px-3 py-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200/60 flex items-center gap-2.5 cursor-pointer transition-colors"
-                        title="View Guest Profile"
+                        title="View Guest Settings"
                       >
                         <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 shrink-0">
                           <User className="w-4 h-4 text-slate-600" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-bold text-dark-text">Guest User</p>
-                          <p className="text-[11px] text-brand-600 font-semibold">Click to view guest profile</p>
+                          <p className="text-[11px] text-brand-600 font-semibold">Click to manage preferences</p>
                         </div>
                       </div>
 
@@ -343,18 +359,6 @@ export function Navbar({
                       </div>
 
                       <div className="h-px bg-border/60 my-1"></div>
-
-                      <button
-                        onClick={() => handleSelectTab('profile')}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                          activeTab === 'profile'
-                            ? 'bg-brand-50 text-brand-700 font-bold'
-                            : 'text-dark-text hover:bg-slate-50'
-                        }`}
-                      >
-                        <User className="w-4 h-4 text-slate-600" />
-                        <span>Guest Profile</span>
-                      </button>
 
                       <button
                         onClick={() => handleSelectTab('safety')}

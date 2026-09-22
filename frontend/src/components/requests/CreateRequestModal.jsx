@@ -83,6 +83,8 @@ export function CreateRequestModal({ isOpen, onClose, onCreated }) {
 
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Sports');
+  const [customCategory, setCustomCategory] = useState('');
+  const [availableCategories, setAvailableCategories] = useState(['Sports', 'Fitness', 'Gaming', 'Study', 'Food', 'Travel', 'Music', 'Others']);
   const [date, setDate] = useState('Today');
   const [time, setTime] = useState('6:00 PM');
   const [radius, setRadius] = useState(2);
@@ -107,10 +109,31 @@ export function CreateRequestModal({ isOpen, onClose, onCreated }) {
       setMeetupCoords({ lat: coordinates.lat, lng: coordinates.lng });
       setShowMapPicker(false);
       setIsSuccess(false);
+      setCustomCategory('');
+
+      // Load dynamic tags from Backend API & Database
+      fetch('http://localhost:5000/api/tags')
+        .then(r => r.json())
+        .then(data => {
+          if (data?.success && Array.isArray(data.tags)) {
+            const tagNames = data.tags.map(t => t.name);
+            if (!tagNames.includes('Others')) tagNames.push('Others');
+            setAvailableCategories(tagNames);
+          }
+        })
+        .catch(() => {
+          try {
+            const storedTags = localStorage.getItem('connect2go_activity_tags');
+            if (storedTags) {
+              const parsed = JSON.parse(storedTags);
+              const tagNames = parsed.map(t => typeof t === 'string' ? t : t.name);
+              if (!tagNames.includes('Others')) tagNames.push('Others');
+              setAvailableCategories(tagNames);
+            }
+          } catch (e) {}
+        });
     }
   }, [isOpen, locationName, coordinates]);
-
-  const categories = ['Sports', 'Fitness', 'Gaming', 'Study', 'Food', 'Travel', 'Music', 'Others'];
 
   const handleMapClick = async (lat, lng) => {
     setMeetupCoords({ lat, lng });
@@ -157,12 +180,14 @@ export function CreateRequestModal({ isOpen, onClose, onCreated }) {
     e.preventDefault();
     if (!title.trim()) return;
 
+    const isOtherCategory = category === 'Others' || category === 'Other';
+    const resolvedCategory = isOtherCategory && customCategory.trim() ? customCategory.trim() : category;
     const bannerImage = categoryBanners[category] || categoryBanners.Sports;
 
     const newActivity = {
       id: `act-${Date.now()}`,
       title: title.trim(),
-      category,
+      category: resolvedCategory,
       distanceKm: 0.5,
       date,
       time,
@@ -180,7 +205,7 @@ export function CreateRequestModal({ isOpen, onClose, onCreated }) {
       },
       imageUrl: bannerImage,
       matchScore: 99,
-      description: description.trim() || `Looking for activity partners for ${category} nearby!`
+      description: description.trim() || `Looking for activity partners for ${resolvedCategory} nearby!`
     };
 
     addActivity(newActivity);
@@ -219,7 +244,7 @@ export function CreateRequestModal({ isOpen, onClose, onCreated }) {
               Activity Category
             </label>
             <div className="flex flex-wrap gap-1.5">
-              {categories.map((cat) => (
+              {availableCategories.map((cat) => (
                 <button
                   type="button"
                   key={cat}
@@ -234,6 +259,22 @@ export function CreateRequestModal({ isOpen, onClose, onCreated }) {
                 </button>
               ))}
             </div>
+
+            {/* If Others is selected, prompt for custom activity name */}
+            {(category === 'Others' || category === 'Other') && (
+              <div className="mt-2.5 p-3 bg-brand-50/80 border border-brand-200 rounded-xl space-y-1">
+                <label className="block text-[11px] font-bold text-brand-900">
+                  Specify Custom Activity Name
+                </label>
+                <input
+                  type="text"
+                  value={customCategory}
+                  onChange={(e) => setCustomCategory(e.target.value)}
+                  placeholder="e.g. Photography Walk, Chess Tournament, Pottery Workshop..."
+                  className="w-full px-3 py-2 bg-white border border-brand-300 rounded-lg text-xs font-semibold text-dark-text focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+            )}
           </div>
 
           {/* Activity Title */}

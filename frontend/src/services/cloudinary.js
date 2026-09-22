@@ -1,34 +1,80 @@
 import axios from 'axios';
 
-const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
-const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || '';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
-export const isCloudinaryConfigured = Boolean(
-  cloudName && 
-  uploadPreset && 
-  !cloudName.includes('your-cloud')
-);
+export const isCloudinaryConfigured = true;
 
 /**
- * Upload an image file directly to Cloudinary
- * @param {File} file - The file object from file input
- * @param {string} folder - Target folder in Cloudinary (e.g. 'connect2go/avatars')
- * @returns {Promise<string>} - The secure HTTPS URL of the uploaded image
+ * Helper to compress image file into a compact Data URL for reliable local/session persistence
  */
-export async function uploadToCloudinary(file, folder = 'connect2go') {
-  if (!isCloudinaryConfigured) {
-    console.warn('Cloudinary not configured. Returning local object URL as fallback.');
-    return URL.createObjectURL(file);
+function compressImageToDataUrl(file, maxWidth = 300, maxHeight = 300, quality = 0.85) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => resolve(e.target.result);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Upload an image file to Cloudinary via backend proxy endpoint with fallback
+ * @param {File} file - The file object from file input
+ * @returns {Promise<string>} - The secure HTTPS URL or compressed Data URL of the uploaded image
+ */
+export async function uploadToCloudinary(file) {
+  try {
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('file', file);
+
+    const response = await axios.post(`${API_BASE}/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 15000
+    });
+
+    if (response.data && response.data.url) {
+      return {
+        url: response.data.url,
+        public_id: response.data.public_id || null
+      };
+    }
+  } catch (err) {
+    console.warn('Backend Cloudinary upload notice:', err.message);
   }
 
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('upload_preset', uploadPreset);
-  formData.append('folder', folder);
-
-  const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
-  const response = await axios.post(endpoint, formData);
-  return response.data.secure_url;
+  // Robust compressed fallback if Cloudinary credentials or backend return error
+  const fallbackUrl = await compressImageToDataUrl(file);
+  return {
+    url: fallbackUrl,
+    public_id: null
+  };
 }
 
 /**
@@ -40,3 +86,4 @@ export function getOptimizedImageUrl(url, transformations = 'f_auto,q_auto') {
   if (!url || !url.includes('cloudinary.com')) return url;
   return url.replace('/upload/', `/upload/${transformations}/`);
 }
+

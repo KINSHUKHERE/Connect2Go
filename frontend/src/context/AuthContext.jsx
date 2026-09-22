@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabase.js';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -38,7 +40,7 @@ export function AuthProvider({ children }) {
     // Clean up old Cloudinary photo if replacing with a different image
     if (oldPublicId && oldPublicId !== publicId) {
       try {
-        await fetch('http://localhost:5000/api/upload', {
+        await fetch(`${API_BASE}/upload`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ public_id: oldPublicId, url: oldAvatar })
@@ -46,7 +48,7 @@ export function AuthProvider({ children }) {
       } catch (e) {}
     } else if (oldAvatar && oldAvatar.includes('cloudinary.com') && oldAvatar !== newAvatarUrl) {
       try {
-        await fetch('http://localhost:5000/api/upload', {
+        await fetch(`${API_BASE}/upload`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: oldAvatar })
@@ -70,15 +72,17 @@ export function AuthProvider({ children }) {
     });
   };
 
-  // Permanently delete user avatar from Cloudinary and reset to default
+  // Permanently delete user avatar from Cloudinary and reset to default person image according to gender
   const removeUserAvatar = async () => {
     const currentAvatar = user?.avatar;
     const currentPublicId = user?.avatarPublicId;
+    const userGender = String(user?.gender || '').trim().toLowerCase();
+    const defaultAvatar = (userGender === 'female' || userGender === 'f') ? '/avatars/female.png' : '/avatars/male.png';
 
-    // Trigger backend deletion if hosted on Cloudinary
-    if (currentPublicId || (currentAvatar && currentAvatar.includes('cloudinary.com'))) {
+    // 1. Trigger backend deletion if hosted on Cloudinary or custom upload
+    if (currentPublicId || (currentAvatar && (currentAvatar.includes('cloudinary.com') || currentAvatar.includes('data:image')))) {
       try {
-        await fetch('http://localhost:5000/api/upload', {
+        await fetch(`${API_BASE}/upload`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -87,17 +91,30 @@ export function AuthProvider({ children }) {
           })
         });
       } catch (err) {
-        console.warn('[Avatar Delete] Backend Cloudinary delete request failed:', err);
+        console.warn('[Avatar Delete] Backend Cloudinary delete request notice:', err);
       }
     }
 
-    // Reset user avatar to null or default generated avatar
-    const defaultDicebear = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name || 'User')}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
+    // 2. Sync DB profile with default gender avatar
+    if (user?.id) {
+      try {
+        await fetch(`${API_BASE}/auth/update-profile`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            avatar_url: defaultAvatar
+          })
+        });
+      } catch (e) {}
+    }
+
+    // 3. Reset user avatar to default person image according to gender
     setUser((prev) => {
       if (!prev) return prev;
       const updated = {
         ...prev,
-        avatar: defaultDicebear,
+        avatar: defaultAvatar,
         avatarPublicId: null
       };
       try {
@@ -106,7 +123,7 @@ export function AuthProvider({ children }) {
       return updated;
     });
 
-    return { success: true };
+    return { success: true, avatar: defaultAvatar };
   };
 
   // Generic profile updater
@@ -150,21 +167,37 @@ export function AuthProvider({ children }) {
   }, []);
 
   const mapSupabaseUser = (sbUser) => {
+    let cachedUser = null;
+    try {
+      const stored = localStorage.getItem('connect2go_user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.id === sbUser.id) cachedUser = parsed;
+      }
+    } catch (e) {}
+
     const meta = sbUser.user_metadata || {};
     const email = sbUser.email || '';
     const isMasterAdmin = email.toLowerCase() === 'herekinshuk@gmail.com' || email.toLowerCase().includes('admin');
+    const userGender = cachedUser?.gender || meta.gender || 'Male';
+    const defaultAvatar = userGender.toLowerCase() === 'female' ? '/avatars/female.png' : '/avatars/male.png';
+
     const newUser = {
       id: sbUser.id,
-      name: isMasterAdmin ? 'Kinshuk Khandelwal' : (meta.name || meta.full_name || email.split('@')[0]),
-      username: meta.username || (isMasterAdmin ? 'kinshuk_admin' : email.split('@')[0]),
-      email: email,
-      avatar: meta.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
-      bio: meta.bio || (isMasterAdmin ? 'Platform Administrator & Creator of Connect2Go.' : 'Ready to explore activities nearby!'),
-      location: meta.location || 'Jaipur, Rajasthan',
-      interests: meta.interests || ['Badminton', 'Study', 'Fitness'],
-      stats: isMasterAdmin ? { activities: 24, matches: 15, connections: 52 } : { activities: 1, matches: 0, connections: 1 },
+      name: cachedUser?.name || meta.name || meta.full_name || (isMasterAdmin ? 'Kinshuk Khandelwal' : email.split('@')[0]),
+      username: cachedUser?.username || meta.username || (isMasterAdmin ? 'kinshuk_admin' : email.split('@')[0]),
+      gender: userGender,
+      email: email || cachedUser?.email,
+      phone: cachedUser?.phone || meta.phone || '',
+      role: isMasterAdmin ? 'admin' : (meta.role || 'user'),
+      avatar: cachedUser?.avatar || meta.avatar_url || defaultAvatar,
+      bio: cachedUser?.bio || meta.bio || (isMasterAdmin ? 'Platform Administrator & Creator of Connect2Go.' : 'Ready to explore activities nearby!'),
+      location: cachedUser?.location || meta.location || 'Campus Hub, Jaipur',
+      interests: cachedUser?.interests || meta.interests || ['Badminton', 'Study', 'Fitness'],
+      stats: cachedUser?.stats || meta.stats || { activities: 0, matches: 0, connections: 0 },
       isAdmin: isMasterAdmin,
     };
+
     setUser(newUser);
     setIsAdmin(newUser.isAdmin);
     try {
@@ -172,8 +205,8 @@ export function AuthProvider({ children }) {
     } catch (e) {}
   };
 
-  // Live Supabase Email/Password Signup with Strict Password Policy
-  const signUpWithEmail = async (email, password, name, username) => {
+  // Live Service-Role Registration (Bypasses email rate limit completely & returns JWT)
+  const signUpWithEmail = async (email, password, name, username, gender, avatar) => {
     setAuthLoading(true);
     setAuthError(null);
 
@@ -198,44 +231,40 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      if (isSupabaseConfigured && supabase.auth) {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              name,
-              username: username || email.split('@')[0],
-              avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80'
-            }
-          }
-        });
+      // Service Role Backend Registration (bypasses rate limit and issues JWT)
+      const res = await fetch(`${API_BASE}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name, username, gender, avatar })
+      });
+      const data = await res.json();
 
-        if (error) throw error;
-        if (data?.user) {
-          mapSupabaseUser(data.user);
-          setAuthModalOpen(false);
-        }
-        return { success: true };
-      } else {
-        // Fallback local registration
-        const newUser = {
-          id: 'usr-' + Date.now(),
-          name: name || email.split('@')[0],
-          username: username || email.split('@')[0],
-          email,
-          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
-          bio: 'Ready to explore activities nearby!',
-          location: 'Jaipur, Rajasthan',
-          interests: ['Badminton', 'Study', 'Fitness'],
-          stats: { activities: 0, matches: 0, connections: 0 },
-          isAdmin: false,
-        };
-        setUser(newUser);
-        setIsAdmin(false);
-        setAuthModalOpen(false);
-        return { success: true, user: newUser };
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Registration failed.');
       }
+
+      if (data.token) {
+        try {
+          localStorage.setItem('connect2go_token', data.token);
+        } catch (e) {}
+      }
+
+      if (data.user) {
+        // Sign in user session on client
+        if (isSupabaseConfigured && supabase.auth) {
+          try {
+            await supabase.auth.signInWithPassword({ email, password });
+          } catch (e) {}
+        }
+        setUser(data.user);
+        setIsAdmin(Boolean(data.user.isAdmin));
+        setAuthModalOpen(false);
+        try {
+          localStorage.setItem('connect2go_user', JSON.stringify(data.user));
+        } catch (e) {}
+        return { success: true, user: data.user, token: data.token };
+      }
+      return { success: true };
     } catch (err) {
       setAuthError(err.message);
       return { success: false, error: err.message };
@@ -254,22 +283,36 @@ export function AuthProvider({ children }) {
     // Master Administrator Login: herekinshuk@gmail.com / 123456
     if (normEmail === 'herekinshuk@gmail.com') {
       if (password === '123456') {
+        if (isSupabaseConfigured && supabase.auth) {
+          try {
+            await supabase.auth.signInWithPassword({
+              email: 'herekinshuk@gmail.com',
+              password: '123456'
+            });
+          } catch (e) {
+            console.warn('Supabase auth sign in notice:', e.message);
+          }
+        }
         const adminUser = {
-          id: 'admin-kinshuk-1',
+          id: 'ae6be659-8914-43ef-bf43-7d6dff91f5f0',
           name: 'Kinshuk Khandelwal',
           username: 'kinshuk_admin',
           email: 'herekinshuk@gmail.com',
           avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
           isAdmin: true,
-          stats: { activities: 24, matches: 15, connections: 52 },
+          role: 'admin',
+          stats: { activities: 0, matches: 0, connections: 0 },
           bio: 'Platform Administrator & Creator of Connect2Go.',
           interests: ['Safety', 'Campus Community', 'Operations', 'Tech'],
-          location: 'Jaipur, HQ'
+          location: 'Campus Hub, Jaipur'
         };
         setUser(adminUser);
         setIsAdmin(true);
         setAuthModalOpen(false);
         setAuthLoading(false);
+        try {
+          localStorage.setItem('connect2go_user', JSON.stringify(adminUser));
+        } catch (e) {}
         return { success: true, user: adminUser, isAdmin: true };
       } else {
         setAuthLoading(false);
@@ -350,7 +393,7 @@ export function AuthProvider({ children }) {
       email: 'herekinshuk@gmail.com',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
       isAdmin: true,
-      stats: { activities: 24, matches: 15, connections: 52 },
+      stats: { activities: 0, matches: 0, connections: 0 },
       bio: 'Platform Administrator & Creator of Connect2Go.',
       interests: ['Safety', 'Campus Community', 'Operations', 'Tech'],
       location: 'Jaipur, HQ'

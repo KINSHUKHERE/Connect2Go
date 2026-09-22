@@ -11,7 +11,6 @@ import { MatchesPage } from './pages/MatchesPage.jsx';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage.jsx';
 import { AdminSecurityGate } from './pages/admin/AdminSecurityGate.jsx';
 import { TrustLegalPage } from './pages/TrustLegalPage.jsx';
-import { ProfilePage } from './pages/ProfilePage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { MessagesPage } from './pages/MessagesPage.jsx';
 import { AuthPage } from './pages/AuthPage.jsx';
@@ -21,71 +20,88 @@ import { ChatDrawer } from './components/chat/ChatDrawer.jsx';
 import { ReportModal } from './components/safety/ReportModal.jsx';
 import { Modal } from './components/ui/Modal.jsx';
 import { Button } from './components/ui/Button.jsx';
-import { Badge } from './components/ui/Badge.jsx';
 import { Footer } from './components/layout/Footer.jsx';
 import { LegalModal } from './components/safety/LegalModal.jsx';
 import { LocationPickerModal } from './components/map/LocationPickerModal.jsx';
-import { Sparkles, Shield, MapPin, Check } from 'lucide-react';
-import { getSafeAvatar, handleAvatarError } from './utils/imageUtils.js';
+import { Sparkles } from 'lucide-react';
 
 function MainApp() {
   const toast = useToast();
-  const { 
-    user, 
-    logout,
-    loginAsUser, 
-    loginAsAdmin, 
-    authModalOpen, 
-    setAuthModalOpen,
-    signInWithEmail,
-    signUpWithEmail,
-    authLoading,
-    authError,
-    setAuthError
-  } = useAuth();
+  const { user, logout } = useAuth();
   
   // Track URL path to separate User Panel (/) from Admin Panel (/admin)
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
-  // Synchronously compute initial tab from URL pathname to eliminate millisecond flash on refresh
-  const getInitialTab = () => {
-    if (typeof window === 'undefined') return 'home';
-    const cleanPath = window.location.pathname.replace(/^\//, '');
-    const validTabs = ['explore', 'my-activities', 'matches', 'messages', 'profile', 'safety', 'settings', 'terms', 'privacy', 'login', 'signup'];
+  // Helper to resolve clean tab name from any pathname, URL, or route string
+  const getTabFromPath = (path) => {
+    if (!path) return 'home';
+    const cleanPath = path
+      .replace(/^\//, '')
+      .replace(/\/+$/, '')
+      .split('?')[0]
+      .split('#')[0]
+      .split('/')[0]
+      .toLowerCase();
+
+    if (cleanPath === 'profile') return 'settings';
+
+    const validTabs = [
+      'explore', 'my-activities', 'matches', 'messages', 
+      'safety', 'settings', 'terms', 'privacy', 
+      'login', 'signup'
+    ];
     if (validTabs.includes(cleanPath)) {
       return cleanPath;
     }
     return 'home';
   };
 
-  const [activeTab, setActiveTab] = useState(getInitialTab);
+  const [activeTab, setActiveTab] = useState(() => getTabFromPath(window.location.pathname));
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatPeer, setChatPeer] = useState('Rohan');
+  const [chatPeer, setChatPeer] = useState('Partner');
   const [comingSoonModal, setComingSoonModal] = useState({ isOpen: false, featureName: '' });
   const [reportModal, setReportModal] = useState({ isOpen: false, targetUser: '' });
   const [legalModal, setLegalModal] = useState({ isOpen: false, tab: 'terms' });
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
-  // Auth Modal State
-  const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup'
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authName, setAuthName] = useState('');
-
   // Access central Chat Context
   const { openOrCreateConversationWithPeer } = useChat();
 
   const navigateTo = (path) => {
-    window.history.pushState({}, '', path);
-    setCurrentPath(path);
+    if (!path) return;
+    let targetPath = path;
+    let nextTab = null;
+
+    if (path === 'home') {
+      targetPath = '/';
+      nextTab = 'home';
+    } else if (path === 'admin') {
+      targetPath = '/admin';
+    } else if (path.startsWith('/admin')) {
+      targetPath = path;
+    } else {
+      targetPath = path.startsWith('/') ? path : `/${path}`;
+      nextTab = getTabFromPath(targetPath);
+    }
+
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({}, '', targetPath);
+    }
+    setCurrentPath(targetPath);
+
+    if (nextTab !== null) {
+      setActiveTab(nextTab);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSelectTab = (tab) => {
-    setActiveTab(tab);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    const targetPath = tab === 'home' ? '/' : `/${tab}`;
-    navigateTo(targetPath);
+    if (tab === 'home') {
+      navigateTo('/');
+    } else {
+      navigateTo(`/${tab}`);
+    }
   };
 
   // Listen to browser URL navigation & initial path sync
@@ -93,12 +109,8 @@ function MainApp() {
     const handleLocationChange = () => {
       const path = window.location.pathname;
       setCurrentPath(path);
-      const cleanPath = path.replace(/^\//, '');
-      const validTabs = ['explore', 'my-activities', 'matches', 'messages', 'profile', 'safety', 'settings', 'terms', 'privacy', 'login', 'signup'];
-      if (validTabs.includes(cleanPath)) {
-        setActiveTab(cleanPath);
-      } else if (path === '/' || cleanPath === '') {
-        setActiveTab('home');
+      if (!path.startsWith('/admin')) {
+        setActiveTab(getTabFromPath(path));
       }
     };
     window.addEventListener('popstate', handleLocationChange);
@@ -216,6 +228,8 @@ function MainApp() {
     // 3. Verified Administrator -> Render Admin Operations Hub
     return (
       <AdminDashboardPage
+        currentPath={currentPath}
+        onNavigate={navigateTo}
         onBackToUserPanel={() => navigateTo('/')}
         onComingSoon={handleOpenComingSoon}
       />
@@ -291,16 +305,7 @@ function MainApp() {
             <MessagesPage
               onNavigate={navigateTo}
               onOpenSafety={() => handleSelectTab('safety')}
-            />
-          )}
-
-          {/* Dedicated Full Page: My Profile */}
-          {activeTab === 'profile' && (
-            <ProfilePage
-              onNavigate={navigateTo}
-              onOpenSettings={() => handleSelectTab('settings')}
-              onOpenSafety={() => handleSelectTab('safety')}
-              onComingSoon={handleOpenComingSoon}
+              onOpenReport={handleOpenReport}
             />
           )}
 
@@ -378,8 +383,9 @@ function MainApp() {
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         peer={chatPeer}
-        peerName={typeof chatPeer === 'string' ? chatPeer : chatPeer?.name || 'Rohan'}
+        peerName={typeof chatPeer === 'string' ? chatPeer : chatPeer?.name || 'Partner'}
         onComingSoon={handleOpenComingSoon}
+        onOpenReport={handleOpenReport}
       />
 
       {/* Safety Report Modal */}
@@ -427,132 +433,6 @@ function MainApp() {
           >
             Got It
           </Button>
-        </div>
-      </Modal>
-
-      {/* Authentication Modal (Sign In / Sign Up) */}
-      <Modal
-        isOpen={authModalOpen}
-        onClose={() => {
-          setAuthModalOpen(false);
-          setAuthError(null);
-        }}
-        title={authMode === 'signin' ? "Welcome Back to Connect2Go" : "Join Connect2Go"}
-        subtitle={authMode === 'signin' ? "Sign in to connect with peers nearby." : "Create your account and discover active partners."}
-        maxWidth="max-w-sm"
-      >
-        <div className="space-y-4 py-2 text-left">
-          
-          {/* Mode Switcher Tabs */}
-          <div className="flex bg-slate-100 p-1 rounded-xl">
-            <button
-              onClick={() => { setAuthMode('signin'); setAuthError(null); }}
-              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                authMode === 'signin' ? 'bg-white text-dark-text shadow-xs' : 'text-dark-muted hover:text-dark-text'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => { setAuthMode('signup'); setAuthError(null); }}
-              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                authMode === 'signup' ? 'bg-white text-dark-text shadow-xs' : 'text-dark-muted hover:text-dark-text'
-              }`}
-            >
-              Create Account
-            </button>
-          </div>
-
-          {/* Error Message */}
-          {authError && (
-            <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg">
-              {authError}
-            </div>
-          )}
-
-          {/* Email / Password Form */}
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (authMode === 'signin') {
-                await signInWithEmail(authEmail, authPassword);
-              } else {
-                await signUpWithEmail(authEmail, authPassword, authName);
-              }
-            }}
-            className="space-y-3"
-          >
-            {authMode === 'signup' && (
-              <div>
-                <label className="text-[11px] font-bold text-dark-muted block mb-1">Your Full Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Kinshuk Khandelwal"
-                  value={authName}
-                  onChange={(e) => setAuthName(e.target.value)}
-                  className="w-full h-10 px-3 bg-slate-50 border border-border rounded-xl text-xs text-dark-text focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="text-[11px] font-bold text-dark-muted block mb-1">Email Address</label>
-              <input
-                type="email"
-                required
-                placeholder="you@example.com"
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                className="w-full h-10 px-3 bg-slate-50 border border-border rounded-xl text-xs text-dark-text focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-              />
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold text-dark-muted block mb-1">Password</label>
-              <input
-                type="password"
-                required
-                placeholder="••••••••"
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                className="w-full h-10 px-3 bg-slate-50 border border-border rounded-xl text-xs text-dark-text focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={authLoading}
-              className="w-full text-xs font-bold h-10"
-            >
-              {authLoading ? 'Authenticating...' : authMode === 'signin' ? 'Sign In' : 'Create Account'}
-            </Button>
-          </form>
-
-          <div className="flex items-center my-2">
-            <div className="flex-1 border-t border-border"></div>
-            <span className="px-3 text-[10px] uppercase font-bold text-dark-faint tracking-wider">or instant demo</span>
-            <div className="flex-1 border-t border-border"></div>
-          </div>
-
-          <div className="space-y-2">
-            <Button
-              variant="outline"
-              onClick={loginAsUser}
-              className="w-full text-xs font-bold border-brand-200 text-brand-700 hover:bg-brand-50"
-            >
-              Quick Test as Demo User
-            </Button>
-            <Button
-              variant="outline"
-              onClick={loginAsAdmin}
-              className="w-full text-xs font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Quick Test as Administrator (Kinshuk Khandelwal)
-            </Button>
-          </div>
-
         </div>
       </Modal>
 
