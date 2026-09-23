@@ -196,8 +196,7 @@ export function ChatProvider({ children }) {
           if (isMe) {
             const matchesMsg = (m) =>
               m.id === msg.id ||
-              (msg.tempId && (m.id === msg.tempId || m.tempId === msg.tempId)) ||
-              (m.sender === 'me' && m.text === msg.text);
+              (msg.tempId && (m.id === msg.tempId || m.tempId === msg.tempId));
 
             const alreadyHas = existingMsgs.some(matchesMsg);
             const updatedMsgs = alreadyHas
@@ -216,7 +215,7 @@ export function ChatProvider({ children }) {
             return nextArr;
           } else {
             const alreadyHasPeerMsg = existingMsgs.some(
-              (m) => m.id === msg.id || (m.sender === 'peer' && m.text === msg.text && m.time === formattedMsg.time)
+              (m) => m.id === msg.id || (msg.tempId && (m.id === msg.tempId || m.tempId === msg.tempId))
             );
             if (alreadyHasPeerMsg) return prev;
 

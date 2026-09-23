@@ -1566,6 +1566,10 @@ app.post('/api/conversations/read', async (req, res) => {
   }
 });
 
+function isValidUuid(str) {
+  return typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+}
+
 app.post('/api/conversations/messages', async (req, res) => {
   try {
     const { conversationId, senderId, senderAlias, text, tempId } = req.body;
@@ -1575,11 +1579,14 @@ app.post('/api/conversations/messages', async (req, res) => {
 
     invalidateConversationReadState(conversationId, senderId);
 
+    const validConvId = isValidUuid(conversationId) ? conversationId : null;
+    const validSenderId = isValidUuid(senderId) ? senderId : null;
+
     let insertedMsg = null;
-    if (supabaseAdmin) {
+    if (supabaseAdmin && validConvId) {
       const { data, error } = await supabaseAdmin.from('messages').insert({
-        conversation_id: conversationId,
-        sender_id: senderId || null,
+        conversation_id: validConvId,
+        sender_id: validSenderId,
         sender_alias: senderAlias || 'Member',
         content: text.trim()
       }).select().single();
@@ -1598,6 +1605,7 @@ app.post('/api/conversations/messages', async (req, res) => {
     };
 
     io.to(conversationId).emit('receive_message', formatted);
+    io.emit('receive_message', formatted);
 
     return res.json({ success: true, message: formatted });
   } catch (err) {
@@ -2397,18 +2405,23 @@ io.on('connection', (socket) => {
 
       // 2. Background Asynchronous Database Persistence (Non-Blocking)
       if (supabaseAdmin) {
-        supabaseAdmin.from('messages').insert({
-          conversation_id: conversationId,
-          sender_id: senderId || null,
-          sender_alias: senderAlias || 'Member',
-          content: text.trim()
-        }).then(({ data }) => {
-          if (data && data.id) {
-            formatted.id = data.id;
-          }
-        }).catch((dbErr) => {
-          console.warn('[Socket Message DB Save Notice]:', dbErr.message);
-        });
+        const validConvId = isValidUuid(conversationId) ? conversationId : null;
+        const validSenderId = isValidUuid(senderId) ? senderId : null;
+
+        if (validConvId) {
+          supabaseAdmin.from('messages').insert({
+            conversation_id: validConvId,
+            sender_id: validSenderId,
+            sender_alias: senderAlias || 'Member',
+            content: text.trim()
+          }).then(({ data }) => {
+            if (data && data.id) {
+              formatted.id = data.id;
+            }
+          }).catch((dbErr) => {
+            console.warn('[Socket Message DB Save Notice]:', dbErr.message);
+          });
+        }
       }
     }
   });
