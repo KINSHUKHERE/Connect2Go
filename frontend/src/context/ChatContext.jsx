@@ -66,7 +66,12 @@ export function ChatProvider({ children }) {
     } catch (e) {}
   };
 
-  const activeConversation = conversations.find((c) => c.id === activeConversationId) || null;
+  const activeConversation =
+    conversations.find(
+      (c) =>
+        c.id === activeConversationId ||
+        (activeConversationId && c.peerId && String(c.peerId) === String(activeConversationId))
+    ) || null;
 
   const fetchConversationsFromBackend = async () => {
     if (!user) return;
@@ -99,6 +104,13 @@ export function ChatProvider({ children }) {
                 ...bc,
                 messages: (bc.messages || []).filter((m) => !m.created_at || new Date(m.created_at).getTime() >= cutoffMs)
               };
+            }
+
+            if (activeConversationId && localConv.id === activeConversationId && localConv.id !== bc.id) {
+              setActiveConversationIdState(bc.id);
+              try {
+                localStorage.setItem('c2g_active_chat_id', bc.id);
+              } catch (e) {}
             }
 
             const bMsgs = bc.messages || [];
@@ -289,8 +301,8 @@ export function ChatProvider({ children }) {
     socket.on('identity_reveal_requested', ({ conversationId, requesterId }) => {
       setConversations((prev) =>
         prev.map((c) => {
-          if (c.id === conversationId) {
-            const isMe = requesterId === user.id;
+          if (c.id === conversationId || (requesterId && String(c.peerId) === String(requesterId))) {
+            const isMe = String(requesterId) === String(user.id);
             return {
               ...c,
               handshakeState: isMe ? 'requested_by_me' : 'requested_by_peer'
@@ -301,10 +313,11 @@ export function ChatProvider({ children }) {
       );
     });
 
-    socket.on('identity_reveal_result', ({ conversationId, status, isRevealed }) => {
+    socket.on('identity_reveal_result', ({ conversationId, status, isRevealed, acceptedBy, rejectedBy }) => {
       setConversations((prev) =>
         prev.map((c) => {
-          if (c.id === conversationId) {
+          const peerMatch = (acceptedBy && String(c.peerId) === String(acceptedBy)) || (rejectedBy && String(c.peerId) === String(rejectedBy));
+          if (c.id === conversationId || peerMatch) {
             if (status === 'accepted' || isRevealed) {
               try {
                 confetti({ particleCount: 110, spread: 80, origin: { y: 0.6 } });
@@ -460,6 +473,29 @@ export function ChatProvider({ children }) {
         conversationId,
         userId: user.id,
         action: 'request'
+      });
+    } catch (e) {}
+  };
+
+  const cancelIdentityRevealRequest = async (conversationId) => {
+    if (!conversationId || !user) return;
+
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conversationId ? { ...c, handshakeState: 'masked' } : c))
+    );
+
+    if (socketRef.current) {
+      socketRef.current.emit('cancel_identity_reveal', {
+        conversationId,
+        requesterId: user.id
+      });
+    }
+
+    try {
+      await axios.post(`${API_BASE}/conversations/reveal`, {
+        conversationId,
+        userId: user.id,
+        action: 'cancel'
       });
     } catch (e) {}
   };
@@ -653,6 +689,7 @@ export function ChatProvider({ children }) {
         sendTypingNotification,
         partnerTyping,
         requestIdentityReveal,
+        cancelIdentityRevealRequest,
         respondIdentityReveal,
         updateHandshakeState,
         markConversationAsRead,

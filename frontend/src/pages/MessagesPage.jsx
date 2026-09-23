@@ -39,6 +39,7 @@ export function MessagesPage({ onNavigate, onOpenSafety, onOpenReport }) {
     sendTypingNotification,
     partnerTyping,
     requestIdentityReveal,
+    cancelIdentityRevealRequest,
     respondIdentityReveal,
     updateHandshakeState, 
     markConversationAsRead,
@@ -409,6 +410,20 @@ export function MessagesPage({ onNavigate, onOpenSafety, onOpenReport }) {
                     >
                       {showProfileCard ? 'Hide Verified' : 'View Verified Info'}
                     </button>
+                  ) : handshakeState === 'requested_by_me' ? (
+                    <button
+                      onClick={() => cancelIdentityRevealRequest(activeConversation.id)}
+                      className="text-[10px] sm:text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl transition-colors shrink-0 flex items-center gap-1.5"
+                      title="Click to cancel reveal request"
+                    >
+                      <X className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Cancel Request</span>
+                    </button>
+                  ) : handshakeState === 'requested_by_peer' ? (
+                    <span className="text-[10px] sm:text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl shrink-0 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-600 animate-pulse" />
+                      <span>Respond Below</span>
+                    </span>
                   ) : (
                     <Button
                       size="sm"
@@ -508,6 +523,12 @@ export function MessagesPage({ onNavigate, onOpenSafety, onOpenReport }) {
                     Handshake sent! Waiting for {peerName.split(' ')[0]} to accept...
                   </span>
                 </div>
+                <button
+                  onClick={() => cancelIdentityRevealRequest(activeConversation.id)}
+                  className="px-2.5 py-1 rounded-lg bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 text-[11px] font-bold transition-colors"
+                >
+                  Cancel Request
+                </button>
               </div>
             </div>
           )}

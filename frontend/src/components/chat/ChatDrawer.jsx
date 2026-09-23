@@ -34,6 +34,7 @@ export function ChatDrawer({ isOpen, onClose, peer, peerName = 'Partner', onComi
     sendTypingNotification, 
     partnerTyping,
     requestIdentityReveal,
+    cancelIdentityRevealRequest,
     respondIdentityReveal,
     deleteConversation,
     clearConversationMessages
@@ -255,6 +256,12 @@ export function ChatDrawer({ isOpen, onClose, peer, peerName = 'Partner', onComi
                     Handshake Sent! Waiting for {(isRevealed ? realName : anonymousAlias).split(' ')[0]} to accept...
                   </span>
                 </div>
+                <button
+                  onClick={() => cancelIdentityRevealRequest(targetConvId)}
+                  className="px-2.5 py-1 rounded-lg bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 text-[11px] font-bold transition-colors shrink-0"
+                >
+                  Cancel Request
+                </button>
               </div>
             </div>
           )}

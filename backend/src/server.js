@@ -1365,8 +1365,8 @@ app.get('/api/conversations', async (req, res) => {
       const peerPart = convParts.find(p => p.user_id !== userId) || convParts[0];
       const peerProfile = peerPart?.user_id ? profilesMap[peerPart.user_id] : null;
 
-      // Determine reveal state: true if all participants are revealed
-      const isRevealed = convParts.length > 0 && convParts.every(p => p.is_revealed);
+      // Determine reveal state: true if any participant is revealed
+      const isRevealed = convParts.length > 0 && convParts.some(p => p.is_revealed);
       
       let handshakeState = isRevealed ? 'revealed' : 'masked';
       if (!isRevealed) {
@@ -1570,6 +1570,60 @@ function isValidUuid(str) {
   return typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
 }
 
+async function saveMessageToSupabase({ conversationId, senderId, senderAlias, text }) {
+  if (!supabaseAdmin || !text || !text.trim()) return null;
+  try {
+    let targetConvId = isValidUuid(conversationId) ? conversationId : null;
+    const validSenderId = isValidUuid(senderId) ? senderId : null;
+
+    if (!targetConvId && validSenderId) {
+      const { data: parts } = await supabaseAdmin
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', validSenderId)
+        .limit(1);
+
+      if (parts && parts.length > 0) {
+        targetConvId = parts[0].conversation_id;
+      } else {
+        const { data: newConv } = await supabaseAdmin
+          .from('conversations')
+          .insert({ type: 'direct' })
+          .select()
+          .single();
+
+        if (newConv && newConv.id) {
+          targetConvId = newConv.id;
+          await supabaseAdmin.from('conversation_participants').insert({
+            conversation_id: targetConvId,
+            user_id: validSenderId,
+            anonymous_alias: senderAlias || 'Member',
+            is_revealed: false
+          });
+        }
+      }
+    }
+
+    if (targetConvId) {
+      const { data: insertedMsg } = await supabaseAdmin
+        .from('messages')
+        .insert({
+          conversation_id: targetConvId,
+          sender_id: validSenderId,
+          sender_alias: senderAlias || 'Member',
+          content: text.trim()
+        })
+        .select()
+        .single();
+
+      return insertedMsg || null;
+    }
+  } catch (err) {
+    console.warn('[DB Save Message Warning]:', err.message);
+  }
+  return null;
+}
+
 app.post('/api/conversations/messages', async (req, res) => {
   try {
     const { conversationId, senderId, senderAlias, text, tempId } = req.body;
@@ -1579,24 +1633,12 @@ app.post('/api/conversations/messages', async (req, res) => {
 
     invalidateConversationReadState(conversationId, senderId);
 
-    const validConvId = isValidUuid(conversationId) ? conversationId : null;
-    const validSenderId = isValidUuid(senderId) ? senderId : null;
-
-    let insertedMsg = null;
-    if (supabaseAdmin && validConvId) {
-      const { data, error } = await supabaseAdmin.from('messages').insert({
-        conversation_id: validConvId,
-        sender_id: validSenderId,
-        sender_alias: senderAlias || 'Member',
-        content: text.trim()
-      }).select().single();
-      if (!error && data) insertedMsg = data;
-    }
+    const insertedMsg = await saveMessageToSupabase({ conversationId, senderId, senderAlias, text });
 
     const formatted = {
       id: insertedMsg?.id || tempId || `msg-${Date.now()}`,
       tempId: tempId || null,
-      conversationId,
+      conversationId: insertedMsg?.conversation_id || conversationId,
       senderId,
       senderAlias: senderAlias || 'Member',
       text: text.trim(),
@@ -1623,10 +1665,9 @@ app.post('/api/conversations/reveal', async (req, res) => {
 
     if (action === 'request') {
       pendingRevealRequests.set(conversationId, userId);
-      io.to(conversationId).emit('identity_reveal_requested', {
-        conversationId,
-        requesterId: userId
-      });
+      const payload = { conversationId, requesterId: userId };
+      io.to(conversationId).emit('identity_reveal_requested', payload);
+      io.emit('identity_reveal_requested', payload);
       return res.json({ success: true, handshakeState: 'requested_by_me' });
     } else if (action === 'accept') {
       pendingRevealRequests.delete(conversationId);
@@ -1636,21 +1677,26 @@ app.post('/api/conversations/reveal', async (req, res) => {
           .update({ is_revealed: true })
           .eq('conversation_id', conversationId);
       }
-      io.to(conversationId).emit('identity_reveal_result', {
+      const acceptedPayload = {
         conversationId,
         status: 'accepted',
         isRevealed: true,
         acceptedBy: userId
-      });
+      };
+      io.to(conversationId).emit('identity_reveal_result', acceptedPayload);
+      io.emit('identity_reveal_result', acceptedPayload);
       return res.json({ success: true, handshakeState: 'revealed' });
-    } else if (action === 'reject') {
+    } else if (action === 'reject' || action === 'cancel') {
       pendingRevealRequests.delete(conversationId);
-      io.to(conversationId).emit('identity_reveal_result', {
+      const rejectedPayload = {
         conversationId,
-        status: 'rejected',
+        status: action === 'cancel' ? 'cancelled' : 'rejected',
         isRevealed: false,
-        rejectedBy: userId
-      });
+        rejectedBy: userId,
+        cancelledBy: userId
+      };
+      io.to(conversationId).emit('identity_reveal_result', rejectedPayload);
+      io.emit('identity_reveal_result', rejectedPayload);
       return res.json({ success: true, handshakeState: 'masked' });
     }
 
@@ -2405,23 +2451,12 @@ io.on('connection', (socket) => {
 
       // 2. Background Asynchronous Database Persistence (Non-Blocking)
       if (supabaseAdmin) {
-        const validConvId = isValidUuid(conversationId) ? conversationId : null;
-        const validSenderId = isValidUuid(senderId) ? senderId : null;
-
-        if (validConvId) {
-          supabaseAdmin.from('messages').insert({
-            conversation_id: validConvId,
-            sender_id: validSenderId,
-            sender_alias: senderAlias || 'Member',
-            content: text.trim()
-          }).then(({ data }) => {
-            if (data && data.id) {
-              formatted.id = data.id;
-            }
-          }).catch((dbErr) => {
-            console.warn('[Socket Message DB Save Notice]:', dbErr.message);
-          });
-        }
+        saveMessageToSupabase({ conversationId, senderId, senderAlias, text }).then((inserted) => {
+          if (inserted && inserted.id) {
+            formatted.id = inserted.id;
+            if (inserted.conversation_id) formatted.conversationId = inserted.conversation_id;
+          }
+        });
       }
     }
   });
@@ -2451,11 +2486,27 @@ io.on('connection', (socket) => {
   socket.on('request_identity_reveal', ({ conversationId, requesterId, requesterAlias }) => {
     if (conversationId && requesterId) {
       pendingRevealRequests.set(conversationId, requesterId);
-      io.to(conversationId).emit('identity_reveal_requested', {
+      const payload = {
         conversationId,
         requesterId,
         requesterAlias: requesterAlias || 'Peer'
-      });
+      };
+      io.to(conversationId).emit('identity_reveal_requested', payload);
+      io.emit('identity_reveal_requested', payload);
+    }
+  });
+
+  socket.on('cancel_identity_reveal', ({ conversationId, requesterId }) => {
+    if (conversationId) {
+      pendingRevealRequests.delete(conversationId);
+      const cancelledPayload = {
+        conversationId,
+        status: 'cancelled',
+        isRevealed: false,
+        cancelledBy: requesterId
+      };
+      io.to(conversationId).emit('identity_reveal_result', cancelledPayload);
+      io.emit('identity_reveal_result', cancelledPayload);
     }
   });
 
@@ -2476,19 +2527,23 @@ io.on('connection', (socket) => {
           }
         }
 
-        io.to(conversationId).emit('identity_reveal_result', {
+        const acceptedPayload = {
           conversationId,
           status: 'accepted',
           isRevealed: true,
           acceptedBy: responderId
-        });
+        };
+        io.to(conversationId).emit('identity_reveal_result', acceptedPayload);
+        io.emit('identity_reveal_result', acceptedPayload);
       } else {
-        io.to(conversationId).emit('identity_reveal_result', {
+        const rejectedPayload = {
           conversationId,
           status: 'rejected',
           isRevealed: false,
           rejectedBy: responderId
-        });
+        };
+        io.to(conversationId).emit('identity_reveal_result', rejectedPayload);
+        io.emit('identity_reveal_result', rejectedPayload);
       }
     }
   });
