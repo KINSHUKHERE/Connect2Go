@@ -191,6 +191,8 @@ function MainApp() {
     handleSelectTab('messages');
   };
 
+  const isAuthTab = activeTab === 'login' || activeTab === 'signup';
+
   const APP_MODE = import.meta.env.VITE_APP_MODE || 'user';
   const isAdminPortal = APP_MODE === 'admin' || currentPath.startsWith('/admin');
 
@@ -206,15 +208,11 @@ function MainApp() {
       )
     );
 
-    // 1. Unauthenticated Guest -> Block with Security Gate
+    // 1. Unauthenticated Guest -> Direct Admin Login Screen (n8n Style Direct Authentication)
     if (!user) {
       return (
         <AdminSecurityGate
           reason="unauthenticated"
-          onSignInAdmin={() => {
-            handleSelectTab('login');
-            toast.info('Please sign in with administrator credentials (herekinshuk@gmail.com).');
-          }}
           onBackToHome={() => navigateTo('/')}
         />
       );
