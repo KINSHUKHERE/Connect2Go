@@ -121,7 +121,7 @@ export function AuthProvider({ children }) {
         avatarPublicId: null
       };
       try {
-        localStorage.setItem('connect2go_user', JSON.stringify(updated));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });
@@ -135,7 +135,7 @@ export function AuthProvider({ children }) {
       if (!prev) return prev;
       const updated = { ...prev, ...fields };
       try {
-        localStorage.setItem('connect2go_user', JSON.stringify(updated));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });

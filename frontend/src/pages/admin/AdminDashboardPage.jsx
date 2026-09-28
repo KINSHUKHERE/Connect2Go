@@ -73,8 +73,54 @@ const getInitialAdminTab = (pathStr) => {
 };
 
 export function AdminDashboardPage({ currentPath, onNavigate, onBackToUserPanel }) {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUserProfile } = useAuth();
   const toast = useToast();
+
+  // Admin Profile Settings State
+  const [adminName, setAdminName] = useState(() => user?.name || 'Kinshuk Khandelwal');
+  const [adminEmail, setAdminEmail] = useState(() => user?.email || 'herekinshuk@gmail.com');
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [profileMessage, setProfileMessage] = useState({ type: '', text: '' });
+  const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
+
+  // Update admin name and email
+  const handleUpdateAdminProfile = (e) => {
+    e.preventDefault();
+    if (!adminName.trim() || !adminEmail.trim()) {
+      setProfileMessage({ type: 'error', text: 'Name and Email cannot be empty.' });
+      return;
+    }
+    updateUserProfile({ name: adminName.trim(), email: adminEmail.trim() });
+    setProfileMessage({ type: 'success', text: 'Administrator profile details updated successfully!' });
+    toast.success('Admin profile updated!');
+    setTimeout(() => setProfileMessage({ type: '', text: '' }), 4000);
+  };
+
+  // Update admin password
+  const handleUpdateAdminPassword = (e) => {
+    e.preventDefault();
+    if (!newPassword) {
+      setPasswordMessage({ type: 'error', text: 'Please enter a new password.' });
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordMessage({ type: 'error', text: 'New password must be at least 6 characters long.' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage({ type: 'error', text: 'New password and confirmation do not match.' });
+      return;
+    }
+    updateUserProfile({ password: newPassword });
+    setPasswordMessage({ type: 'success', text: 'Administrator security password updated successfully!' });
+    toast.success('Admin password updated!');
+    setOldPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setTimeout(() => setPasswordMessage({ type: '', text: '' }), 4000);
+  };
 
   // Exactly the 7 allowed tabs requested by the user, dynamically synced with URL
   const [currentNav, setCurrentNav] = useState(() => getInitialAdminTab(currentPath));
@@ -1634,30 +1680,126 @@ export function AdminDashboardPage({ currentPath, onNavigate, onBackToUserPanel 
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                {/* Admin Profile Details */}
-                <div className="bg-white p-6 rounded-3xl border border-border shadow-soft space-y-4">
+                {/* Editable Admin Profile Details & Password Update */}
+                <div className="bg-white p-6 rounded-3xl border border-border shadow-soft space-y-6">
                   <h3 className="text-sm font-bold text-dark-text uppercase tracking-wider flex items-center gap-2">
                     <Shield className="w-4 h-4 text-brand-600" />
-                    <span>Administrator Profile</span>
+                    <span>Administrator Profile Credentials</span>
                   </h3>
 
-                  <div className="space-y-3">
-                    <div className="p-3 bg-slate-50 rounded-xl border border-border/60">
-                      <p className="text-[10px] uppercase font-bold text-slate-400">Admin Account</p>
-                      <p className="text-xs font-bold text-dark-text mt-0.5">{user?.name || 'Kinshuk Khandelwal'}</p>
-                    </div>
-
-                    <div className="p-3 bg-slate-50 rounded-xl border border-border/60">
-                      <p className="text-[10px] uppercase font-bold text-slate-400">Admin Primary Email</p>
-                      <p className="text-xs font-bold text-dark-text mt-0.5">herekinshuk@gmail.com</p>
-                    </div>
-
-                    <div className="p-3 bg-slate-50 rounded-xl border border-border/60">
-                      <p className="text-[10px] uppercase font-bold text-slate-400">Security Access Level</p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span className="text-xs font-bold text-emerald-700">Root Superuser (Full Platform Authority)</span>
+                  {/* Profile Info Form (Name & Email) */}
+                  <form onSubmit={handleUpdateAdminProfile} className="space-y-4">
+                    {profileMessage.text && (
+                      <div className={`p-3 text-xs rounded-xl border flex items-center gap-2 ${
+                        profileMessage.type === 'success' 
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                          : 'bg-red-50 text-red-800 border-red-200'
+                      }`}>
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        <span>{profileMessage.text}</span>
                       </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        Administrator Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={adminName}
+                        onChange={(e) => setAdminName(e.target.value)}
+                        placeholder="Kinshuk Khandelwal"
+                        className="w-full h-10 px-3.5 bg-slate-50 border border-border rounded-xl text-xs font-semibold focus:outline-none focus:border-brand-500 focus:bg-white transition-colors"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        Administrator Primary Email
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={adminEmail}
+                        onChange={(e) => setAdminEmail(e.target.value)}
+                        placeholder="herekinshuk@gmail.com"
+                        className="w-full h-10 px-3.5 bg-slate-50 border border-border rounded-xl text-xs font-semibold focus:outline-none focus:border-brand-500 focus:bg-white transition-colors"
+                      />
+                    </div>
+
+                    <Button type="submit" size="sm" className="w-full h-9 text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white">
+                      Save Profile Credentials
+                    </Button>
+                  </form>
+
+                  <hr className="border-border/60" />
+
+                  {/* Password Update Form */}
+                  <form onSubmit={handleUpdateAdminPassword} className="space-y-4 pt-1">
+                    <h4 className="text-xs font-bold text-dark-text uppercase tracking-wider flex items-center gap-1.5">
+                      <KeyRound className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Update Security Password</span>
+                    </h4>
+
+                    {passwordMessage.text && (
+                      <div className={`p-3 text-xs rounded-xl border flex items-center gap-2 ${
+                        passwordMessage.type === 'success' 
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                          : 'bg-red-50 text-red-800 border-red-200'
+                      }`}>
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        <span>{passwordMessage.text}</span>
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-600">Old / Current Password</label>
+                      <input
+                        type="password"
+                        value={oldPassword}
+                        onChange={(e) => setOldPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full h-10 px-3.5 bg-slate-50 border border-border rounded-xl text-xs font-semibold focus:outline-none focus:border-brand-500 focus:bg-white transition-colors"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-600">New Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full h-10 px-3.5 bg-slate-50 border border-border rounded-xl text-xs font-semibold focus:outline-none focus:border-brand-500 focus:bg-white transition-colors"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-600">Confirm New Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full h-10 px-3.5 bg-slate-50 border border-border rounded-xl text-xs font-semibold focus:outline-none focus:border-brand-500 focus:bg-white transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    <Button type="submit" size="sm" variant="outline" className="w-full h-9 text-xs font-bold border-brand-300 text-brand-700 hover:bg-brand-50">
+                      Update Security Password
+                    </Button>
+                  </form>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-border/60 mt-2">
+                    <p className="text-[10px] uppercase font-bold text-slate-400">Security Access Level</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-bold text-emerald-700">Root Superuser (Full Platform Authority)</span>
                     </div>
                   </div>
                 </div>
