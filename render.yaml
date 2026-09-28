@@ -1,0 +1,20 @@
+services:
+  - type: static
+    name: connect2go-app
+    rootDir: frontend
+    buildCommand: npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  - type: static
+    name: connect2go-admin
+    rootDir: frontend
+    buildCommand: npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
