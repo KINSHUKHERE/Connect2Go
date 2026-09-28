@@ -168,17 +168,19 @@ export function GeoProvider({ children }) {
     syncLocationToBackend(coordinates.lat, coordinates.lng, locationName);
   }, [selectedCategory, radiusKm, coordinates, locationName]);
 
-  // Connect Socket.IO for real-time live activity creation
+  // Connect Socket.IO for real-time live customer page updates (Zero Refresh)
   useEffect(() => {
     let socket;
     try {
-      socket = io(SOCKET_URL, { reconnectionAttempts: 3, timeout: 3000 });
+      socket = io(SOCKET_URL, { reconnectionAttempts: 5, timeout: 5000 });
+
       socket.on('activity_created', (newAct) => {
+        if (!newAct) return;
         const formatted = {
           id: newAct.id,
           title: newAct.title,
           category: newAct.category,
-          distanceKm: 0.5,
+          distanceKm: newAct.distance_km ?? 0.5,
           date: 'Just now',
           time: newAct.time_slot || 'Today',
           time_slot: newAct.time_slot || 'Today',
@@ -187,7 +189,7 @@ export function GeoProvider({ children }) {
           lat: newAct.lat || coordinates.lat,
           lng: newAct.lon || coordinates.lng,
           participantCount: newAct.max_participants || 4,
-          joinedCount: 1,
+          joinedCount: newAct.current_participants || 1,
           creator: {
             name: newAct.creator_name || 'Member',
             avatar: newAct.creator_avatar || '/avatars/male.png',
@@ -197,6 +199,7 @@ export function GeoProvider({ children }) {
           matchScore: 95,
           description: newAct.description
         };
+
         setActivities(prev => {
           const exists = prev.some(a => a.id === formatted.id || (a.title === formatted.title && a.creator?.name === formatted.creator.name));
           if (exists) {
@@ -206,8 +209,59 @@ export function GeoProvider({ children }) {
         });
       });
 
+      socket.on('activity_updated', (updatedAct) => {
+        if (!updatedAct || !updatedAct.id) return;
+        setActivities(prev =>
+          prev.map(a => {
+            if (a.id === updatedAct.id) {
+              const newJoined = updatedAct.current_participants ?? (a.joinedCount + 1);
+              return {
+                ...a,
+                joinedCount: newJoined,
+                current_participants: newJoined,
+                participantCount: updatedAct.max_participants || a.participantCount,
+                time_slot: updatedAct.time_slot || a.time_slot,
+                title: updatedAct.title || a.title
+              };
+            }
+            return a;
+          })
+        );
+      });
+
+      socket.on('activity_deleted', ({ id }) => {
+        if (!id) return;
+        setActivities(prev => prev.filter(a => a.id !== id));
+      });
+
       socket.on('user_location_updated', () => {
         fetchPeople();
+      });
+
+      socket.on('user_updated', () => {
+        fetchPeople();
+      });
+
+      socket.on('user_presence_updated', ({ userId, online }) => {
+        setPeople(prev =>
+          prev.map(p => (p.id === userId ? { ...p, status: online ? 'Online' : 'Offline' } : p))
+        );
+      });
+
+      socket.on('user_created', () => {
+        fetchPeople();
+      });
+
+      socket.on('user_deleted', () => {
+        fetchPeople();
+      });
+
+      socket.on('tag_created', () => {
+        fetchActivities();
+      });
+
+      socket.on('tag_deleted', () => {
+        fetchActivities();
       });
     } catch (e) {
       // socket fallback

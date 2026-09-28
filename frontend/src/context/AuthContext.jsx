@@ -2,13 +2,16 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabase.js';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const APP_MODE = import.meta.env.VITE_APP_MODE || 'user';
+const STORAGE_KEY = APP_MODE === 'admin' ? 'connect2go_admin_user' : 'connect2go_user';
+const TOKEN_KEY = APP_MODE === 'admin' ? 'connect2go_admin_token' : 'connect2go_token';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try {
-      const stored = localStorage.getItem('connect2go_user');
+      const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed && parsed.id) return parsed;
@@ -19,10 +22,10 @@ export function AuthProvider({ children }) {
 
   const [isAdmin, setIsAdmin] = useState(() => {
     try {
-      const stored = localStorage.getItem('connect2go_user');
+      const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        return Boolean(parsed?.isAdmin);
+        return Boolean(parsed?.isAdmin || parsed?.role === 'admin' || parsed?.email === 'herekinshuk@gmail.com');
       }
     } catch (e) {}
     return false;
@@ -319,7 +322,7 @@ export function AuthProvider({ children }) {
 
       if (data.token) {
         try {
-          localStorage.setItem('connect2go_token', data.token);
+          localStorage.setItem(TOKEN_KEY, data.token);
         } catch (e) {}
       }
 
@@ -331,10 +334,10 @@ export function AuthProvider({ children }) {
           } catch (e) {}
         }
         setUser(data.user);
-        setIsAdmin(Boolean(data.user.isAdmin));
+        setIsAdmin(Boolean(data.user.isAdmin || data.user.role === 'admin'));
         setAuthModalOpen(false);
         try {
-          localStorage.setItem('connect2go_user', JSON.stringify(data.user));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data.user));
         } catch (e) {}
         return { success: true, user: data.user, token: data.token };
       }
@@ -385,7 +388,7 @@ export function AuthProvider({ children }) {
         setAuthModalOpen(false);
         setAuthLoading(false);
         try {
-          localStorage.setItem('connect2go_user', JSON.stringify(adminUser));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(adminUser));
         } catch (e) {}
         return { success: true, user: adminUser, isAdmin: true };
       } else {
@@ -423,9 +426,20 @@ export function AuthProvider({ children }) {
           stats: { activities: 1, matches: 0, connections: 1 },
           isAdmin: false,
         };
+
+        if (APP_MODE === 'admin' && !loggedUser.isAdmin) {
+          const err = 'Access Denied: Administrator credentials required for Admin Portal.';
+          setAuthError(err);
+          setAuthLoading(false);
+          return { success: false, error: err };
+        }
+
         setUser(loggedUser);
         setIsAdmin(false);
         setAuthModalOpen(false);
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(loggedUser));
+        } catch (e) {}
         return { success: true, user: loggedUser };
       }
     } catch (err) {
@@ -454,7 +468,7 @@ export function AuthProvider({ children }) {
     setIsAdmin(false);
     setAuthModalOpen(false);
     try {
-      localStorage.setItem('connect2go_user', JSON.stringify(demoUser));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(demoUser));
     } catch (e) {}
     return demoUser;
   };
@@ -476,14 +490,15 @@ export function AuthProvider({ children }) {
     setIsAdmin(true);
     setAuthModalOpen(false);
     try {
-      localStorage.setItem('connect2go_user', JSON.stringify(adminUser));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(adminUser));
     } catch (e) {}
     return adminUser;
   };
 
   const logout = async () => {
     try {
-      localStorage.removeItem('connect2go_user');
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(TOKEN_KEY);
     } catch (e) {}
     setUser(null);
     setIsAdmin(false);

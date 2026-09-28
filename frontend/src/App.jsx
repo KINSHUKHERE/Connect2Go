@@ -66,7 +66,17 @@ function MainApp() {
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   // Access central Chat Context
-  const { openOrCreateConversationWithPeer } = useChat();
+  const { openOrCreateConversationWithPeer, setActiveConversationId, activeConversationId } = useChat();
+
+  // Auto-close chat drawer and reset active conversation when user leaves the messages tab
+  useEffect(() => {
+    if (activeTab !== 'messages') {
+      setIsChatOpen(false);
+      if (activeConversationId) {
+        setActiveConversationId(null);
+      }
+    }
+  }, [activeTab, activeConversationId]);
 
   const navigateTo = (path) => {
     if (!path) return;
@@ -181,12 +191,13 @@ function MainApp() {
     handleSelectTab('messages');
   };
 
-  const isAuthTab = activeTab === 'login' || activeTab === 'signup';
+  const APP_MODE = import.meta.env.VITE_APP_MODE || 'user';
+  const isAdminPortal = APP_MODE === 'admin' || currentPath.startsWith('/admin');
 
   // ==========================================
-  // RENDER SEPARATE ADMIN PANEL AT /admin (PROTECTED)
+  // RENDER SEPARATE ADMIN PANEL (PROTECTED)
   // ==========================================
-  if (currentPath.startsWith('/admin')) {
+  if (isAdminPortal) {
     const isUserAdmin = Boolean(
       user && (
         user.isAdmin === true ||
@@ -387,7 +398,12 @@ function MainApp() {
       {/* Anonymous Real-Time Chat Drawer with Dual Reveal Handshake */}
       <ChatDrawer
         isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
+        onClose={() => {
+          setIsChatOpen(false);
+          if (setActiveConversationId) {
+            setActiveConversationId(null);
+          }
+        }}
         peer={chatPeer}
         peerName={typeof chatPeer === 'string' ? chatPeer : chatPeer?.name || 'Partner'}
         onComingSoon={handleOpenComingSoon}

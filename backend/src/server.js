@@ -121,6 +121,16 @@ const server = http.createServer(app);
 
 const PORT = process.env.PORT || 5000;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const ADMIN_CLIENT_URL = process.env.ADMIN_CLIENT_URL || 'http://localhost:5174';
+
+const allowedOrigins = Array.from(new Set([
+  CLIENT_URL,
+  ADMIN_CLIENT_URL,
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174'
+].filter(Boolean)));
 
 // Configure Multer for in-memory file uploads
 const upload = multer({
@@ -130,7 +140,7 @@ const upload = multer({
 
 // Middleware
 app.use(cors({
-  origin: [CLIENT_URL, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: allowedOrigins,
   credentials: true
 }));
 app.use(express.json());
@@ -138,7 +148,7 @@ app.use(express.json());
 // Socket.IO Setup
 const io = new Server(server, {
   cors: {
-    origin: [CLIENT_URL, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true
   }

@@ -33,6 +33,10 @@ export function ChatProvider({ children }) {
 
   const [activeConversationId, setActiveConversationIdState] = useState(() => {
     try {
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/messages')) {
+        localStorage.removeItem('c2g_active_chat_id');
+        return null;
+      }
       return localStorage.getItem('c2g_active_chat_id') || null;
     } catch (e) {
       return null;

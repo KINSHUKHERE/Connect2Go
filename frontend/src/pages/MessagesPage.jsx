@@ -350,7 +350,12 @@ export function MessagesPage({ onNavigate, onOpenSafety, onOpenReport }) {
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                   {/* Back to list on mobile */}
                   <button
-                    onClick={() => setMobileView('list')}
+                    onClick={() => {
+                      setMobileView('list');
+                      if (setActiveConversationId) {
+                        setActiveConversationId(null);
+                      }
+                    }}
                     className="sm:hidden p-1 text-dark-muted hover:text-dark-text shrink-0"
                   >
                     <ArrowLeft className="w-5 h-5" />
