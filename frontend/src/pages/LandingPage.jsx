@@ -16,6 +16,7 @@ import { Button } from '../components/ui/Button.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
 import { handleImageError } from '../utils/imageUtils.js';
 import { useChat } from '../context/ChatContext.jsx';
+import { StickyScrollCards } from '../components/ui/sticky-scroll-cards.jsx';
 
 export function LandingPage({ onGetStarted, onExplore, onOpenMessages, onComingSoon }) {
   const { totalUnreadMessages, unreadUsersCount } = useChat();
@@ -28,27 +29,54 @@ export function LandingPage({ onGetStarted, onExplore, onOpenMessages, onComingS
     { label: 'Cycling Treks', icon: '🚴', count: '12 nearby', color: 'bg-teal-50 text-teal-700 border-teal-200' },
   ];
 
-  const steps = [
+  const howItWorksCards = [
     {
-      num: '01',
-      title: 'Discover Nearby',
-      desc: 'Set your radius from 1 to 20 km. Browse real-world activities hosted by verified campus & neighborhood peers.',
-      icon: MapPin,
-      badge: 'Hyper-Local'
+      number: '01',
+      badge: 'Hyper-Local Discovery',
+      title: 'Discover Nearby People & Activities',
+      description: 'Set your preferred radius (from 0.5 km to 20 km). Instantly discover nearby people and active meetups hosted by verified campus & neighborhood peers.',
+      src: 'https://images.unsplash.com/photo-1539635278303-d4002c07eae3?w=1200&auto=format&fit=crop&q=85',
+      features: [
+        'Real-time GPS & radius filter (0.5 km – 20 km)',
+        'Filter by Sports, Study, Fitness, Gaming & Hobbies',
+        'Verified student & neighborhood community circles'
+      ]
     },
     {
-      num: '02',
-      title: 'Chat Anonymously',
-      desc: 'Connect under a fun pseudonym first. Discuss timing, equipment, and plans without exposing private phone numbers.',
-      icon: MessageSquare,
-      badge: 'Privacy-First'
+      number: '02',
+      badge: 'Instant Connection',
+      title: 'Join or Host Real-World Meetups',
+      description: 'Find someone to play badminton, go for a morning run, form a study group, or grab coffee. One tap to join existing activities or create your own.',
+      src: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&auto=format&fit=crop&q=85',
+      features: [
+        'Single tap request to join group or 1-on-1 meetups',
+        'Set exact time, venue, and participant limits',
+        'Zero algorithmic feed distraction'
+      ]
     },
     {
-      num: '03',
-      title: 'Meet in the Real World',
-      desc: 'Step out, meet at public courts, parks, or study spots. Have fun, make memories, and expand your physical circle.',
-      icon: Users,
-      badge: 'Zero Doomscroll'
+      number: '03',
+      badge: 'Privacy-First Pseudonyms',
+      title: 'Chat Anonymously Before Meeting',
+      description: 'Connect safely under a fun pseudonym first. Coordinate timings, venues, and equipment without revealing personal phone numbers or social handles.',
+      src: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=1200&auto=format&fit=crop&q=85',
+      features: [
+        'Dual-blind identity masking until mutual reveal consent',
+        'End-to-end encrypted direct real-time chat',
+        '24/7 automated spam & safety reporting'
+      ]
+    },
+    {
+      number: '04',
+      badge: 'Real-Life Experiences',
+      title: 'Meet in the Real World Safely',
+      description: 'Step out, meet at public campus courts, parks, libraries, or local cafes. Build authentic real-life friendships around the activities you love.',
+      src: 'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=1200&auto=format&fit=crop&q=85',
+      features: [
+        'Public venue meeting recommendations',
+        '100% focused on physical real-world activities',
+        'Turn online discovery into real memories'
+      ]
     }
   ];
 
@@ -227,50 +255,12 @@ export function LandingPage({ onGetStarted, onExplore, onOpenMessages, onComingS
         </div>
       </section>
 
-      {/* 3 Steps: How Connect2Go Works */}
+      {/* How Connect2Go Works (Sticky Scroll Cards Stacking) */}
       <section className="w-full max-w-[1700px] mx-auto px-4 sm:px-8 lg:px-12">
-        <div className="text-center max-w-2xl mx-auto mb-12 space-y-3">
-          <Badge variant="mint" size="md">
-            SIMPLE & SAFE JOURNEY
-          </Badge>
-          <h2 className="text-2xl sm:text-4xl font-extrabold text-dark-text tracking-tight">
-            How Connect2Go Works
-          </h2>
-          <p className="text-sm text-dark-muted">
-            From discovering someone who wants to play, to meeting up safely at the court.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
-          {steps.map((step) => {
-            const Icon = step.icon;
-            return (
-              <div
-                key={step.num}
-                className="bg-white p-7 rounded-3xl border border-border/80 shadow-soft text-left space-y-4 relative group hover:border-brand-300 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center font-bold">
-                    <Icon className="w-6 h-6" />
-                  </div>
-                  <span className="text-3xl font-black text-slate-200 group-hover:text-brand-200 transition-colors">
-                    {step.num}
-                  </span>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="inline-block text-[10px] font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded border border-brand-200">
-                    {step.badge}
-                  </div>
-                  <h3 className="text-lg font-bold text-dark-text">{step.title}</h3>
-                  <p className="text-xs sm:text-sm text-dark-muted leading-relaxed">
-                    {step.desc}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <StickyScrollCards
+          hint="HOW CONNECT2GO WORKS"
+          cards={howItWorksCards}
+        />
       </section>
 
       {/* 3 Core Pillars Section */}
