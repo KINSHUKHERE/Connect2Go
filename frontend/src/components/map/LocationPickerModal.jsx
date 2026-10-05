@@ -70,7 +70,18 @@ export function LocationPickerModal({ isOpen, onClose }) {
     isDetectingLocation 
   } = useGeo();
 
-  const [pickedCoords, setPickedCoords] = useState({ lat: coordinates.lat, lng: coordinates.lng });
+  const getValidCoord = (val, fallback = 26.7725) => {
+    const num = Number(val);
+    return (!isNaN(num) && isFinite(num) && num !== 0) ? num : fallback;
+  };
+
+  const [pickedCoords, setPickedCoords] = useState({ 
+    lat: getValidCoord(coordinates?.lat, 26.7725), 
+    lng: getValidCoord(coordinates?.lng, 75.8753) 
+  });
+
+  const safeLat = getValidCoord(pickedCoords?.lat || coordinates?.lat, 26.7725);
+  const safeLng = getValidCoord(pickedCoords?.lng || coordinates?.lng, 75.8753);
   const [pickedName, setPickedName] = useState(locationName);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -80,7 +91,10 @@ export function LocationPickerModal({ isOpen, onClose }) {
 
   useEffect(() => {
     if (isOpen) {
-      setPickedCoords({ lat: coordinates.lat, lng: coordinates.lng });
+      setPickedCoords({ 
+        lat: getValidCoord(coordinates?.lat, 26.7725), 
+        lng: getValidCoord(coordinates?.lng, 75.8753) 
+      });
       setPickedName(locationName);
       setSearchQuery('');
       setSearchResults([]);
@@ -278,7 +292,7 @@ export function LocationPickerModal({ isOpen, onClose }) {
             </div>
 
             <MapContainer
-              center={[pickedCoords.lat, pickedCoords.lng]}
+              center={[safeLat, safeLng]}
               zoom={13}
               scrollWheelZoom={true}
               className="w-full h-full"
@@ -289,9 +303,9 @@ export function LocationPickerModal({ isOpen, onClose }) {
                 tileSize={256}
                 maxZoom={20}
               />
-              <FlyToLocation center={[pickedCoords.lat, pickedCoords.lng]} />
+              <FlyToLocation center={[safeLat, safeLng]} />
               <MapEvents onLocationClick={handleMapClick} />
-              <Marker position={[pickedCoords.lat, pickedCoords.lng]} icon={pickedPinIcon}>
+              <Marker position={[safeLat, safeLng]} icon={pickedPinIcon}>
                 <Tooltip permanent direction="top" offset={[0, -32]} className="font-sans font-bold text-xs shadow-md">
                   <span>📍 {isGeocoding ? 'Detecting...' : pickedName}</span>
                 </Tooltip>

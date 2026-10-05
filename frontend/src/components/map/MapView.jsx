@@ -88,15 +88,43 @@ const categoryEmojis = {
 };
 
 // Map View Controller to smoothly fly to coordinates when changed
-function MapController({ center, zoom = 14 }) {
+function MapController({ lat, lng, zoom = 14 }) {
   const map = useMap();
+  const prevRef = useRef(null);
+
   useEffect(() => {
-    if (center && center[0] && center[1]) {
-      map.flyTo(center, zoom, { duration: 1.2 });
+    if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+      try {
+        const size = map.getSize();
+        if (size && size.x > 0 && size.y > 0) {
+          const prev = prevRef.current;
+          if (!prev || Math.abs(prev.lat - lat) > 0.0001 || Math.abs(prev.lng - lng) > 0.0001) {
+            map.flyTo([lat, lng], zoom, { duration: 1.2 });
+            prevRef.current = { lat, lng };
+          }
+        }
+      } catch (e) {}
     }
-  }, [center, zoom, map]);
+  }, [lat, lng, zoom, map]);
+
   return null;
 }
+
+// Helper to ensure 100% valid, deterministic, non-NaN coordinates for Leaflet map
+const getValidCoord = (val, baseCoord, index = 0, isLat = true) => {
+  const num = Number(val);
+  if (!isNaN(num) && isFinite(num) && num !== 0) {
+    return num;
+  }
+  const baseN = Number(baseCoord);
+  const safeBase = (!isNaN(baseN) && isFinite(baseN) && baseN !== 0) 
+    ? baseN 
+    : (isLat ? 26.7725 : 75.8753);
+  const angle = ((index + 1) * 45 * Math.PI) / 180;
+  const dist = 0.003 + (index % 5) * 0.002;
+  const offset = isLat ? Math.sin(angle) * dist : Math.cos(angle) * dist;
+  return safeBase + offset;
+};
 
 export function MapView({ onJoinActivity }) {
   const { 
@@ -109,6 +137,9 @@ export function MapView({ onJoinActivity }) {
     setCustomLocation,
     isDetectingLocation 
   } = useGeo();
+
+  const safeLat = getValidCoord(coordinates?.lat, 26.7725, 0, true);
+  const safeLng = getValidCoord(coordinates?.lng, 75.8753, 0, false);
 
   // Search state for India locations
   const [searchQuery, setSearchQuery] = useState('');
@@ -247,7 +278,7 @@ export function MapView({ onJoinActivity }) {
       <div className="w-full h-[520px] sm:h-[600px] rounded-2xl overflow-hidden border border-border/90 shadow-soft relative z-10">
         
         <MapContainer
-          center={[coordinates.lat, coordinates.lng]}
+          center={[safeLat, safeLng]}
           zoom={14}
           scrollWheelZoom={true}
           className="w-full h-full"
@@ -261,11 +292,11 @@ export function MapView({ onJoinActivity }) {
           />
 
           {/* Controller to fly smoothly to new coordinates */}
-          <MapController center={[coordinates.lat, coordinates.lng]} zoom={14} />
+          <MapController lat={safeLat} lng={safeLng} zoom={14} />
 
           {/* Dynamic Radar Search Radius Circle around User's Location */}
           <Circle
-            center={[coordinates.lat, coordinates.lng]}
+            center={[safeLat, safeLng]}
             radius={radiusKm * 1000}
             pathOptions={{
               color: '#22C55E',
@@ -277,7 +308,7 @@ export function MapView({ onJoinActivity }) {
           />
 
           {/* Live User Location Beacon Marker */}
-          <Marker position={[coordinates.lat, coordinates.lng]} icon={liveUserIcon}>
+          <Marker position={[safeLat, safeLng]} icon={liveUserIcon}>
             <Tooltip permanent direction="top" offset={[0, -18]} className="font-sans font-bold text-xs shadow-md">
               <span>📍 {locationName}</span>
             </Tooltip>
@@ -293,14 +324,16 @@ export function MapView({ onJoinActivity }) {
           </Marker>
 
           {/* Activity Pins with Emoji Icons */}
-          {activities.map((act) => {
+          {activities.map((act, idx) => {
             const emoji = categoryEmojis[act.category] || '✨';
             const pinIcon = createCustomPin(emoji, '#22C55E');
+            const actLat = getValidCoord(act.lat, safeLat, idx + 1, true);
+            const actLng = getValidCoord(act.lng, safeLng, idx + 1, false);
 
             return (
               <Marker
                 key={act.id}
-                position={[act.lat, act.lng]}
+                position={[actLat, actLng]}
                 icon={pinIcon}
               >
                 <Popup>

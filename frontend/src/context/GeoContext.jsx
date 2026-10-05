@@ -18,8 +18,10 @@ const getInitialLocation = () => {
     const saved = localStorage.getItem('connect2go_user_location');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (parsed.lat && parsed.lng) {
-        return parsed;
+      const lat = Number(parsed?.lat);
+      const lng = Number(parsed?.lng);
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        return { lat, lng, name: parsed.name || 'Poornima Campus Hub' };
       }
     }
   } catch (e) {}
@@ -34,7 +36,7 @@ export function GeoProvider({ children }) {
   const [radiusKm, setRadiusKm] = useState(15);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState('grid');
+  const [viewMode, setViewMode] = useState('map');
   const [activities, setActivities] = useState([]);
   const [people, setPeople] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
